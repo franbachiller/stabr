@@ -223,6 +223,37 @@ máquinas de los usuarios. Detalle en [LICENSING.md](LICENSING.md).
 
 ---
 
+## D-019 · Fase 1 · `DiscreteIntParameter`: `juce::AudioParameterInt` se exporta como continuo
+
+**Decisión:** todo parámetro entero de STABR usa `stabr::DiscreteIntParameter`,
+una subclase de `juce::AudioParameterInt` que sólo agrega
+`bool isDiscrete() const override { return true; }`.
+
+**El problema:** `juce::AudioParameterInt` sobreescribe `getNumSteps()` pero
+**no** `isDiscrete()`, que queda en el `false` de la clase base. El wrapper VST3
+de JUCE decide el `stepCount` así
+(`juce_audio_plugin_client_VST3.cpp`, `updateParameterInfo()`):
+
+```cpp
+if (! param.isDiscrete())
+    return 0;
+```
+
+Es decir: **todo `AudioParameterInt` llega al host como parámetro continuo.**
+El valor se redondea bien puertas adentro, pero el host dibuja un control
+continuo y automatiza en rampa suave donde deberían verse escalones.
+
+**Cómo apareció:** leyendo el log de pluginval, no por un fallo. pluginval
+reportaba `numSteps - 2147483647, isDiscrete - 0` para `Polyphony` (1..16) y
+`Pitch Bend Range` (0..24). No lo marca como error porque es legal — es un
+defecto de UX, no de conformidad. Después del arreglo reporta `numSteps 16` y
+`numSteps 25`, ambos `isDiscrete 1`.
+
+Es seguro cambiar un `AudioParameterInt` ya existente por este: no toca el ID,
+ni el rango, ni el mapeo de valores, así que no rompe estados guardados.
+
+---
+
 ## Decisiones tomadas y pendientes de implementar
 
 Confirmadas con el usuario, se implementan en la fase que corresponde:

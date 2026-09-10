@@ -1,5 +1,6 @@
 #include "ParameterLayout.h"
 #include "ParameterIDs.h"
+#include "DiscreteIntParameter.h"
 
 namespace stabr
 {
@@ -91,10 +92,10 @@ APVTS::ParameterLayout createParameterLayout()
         juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (dbText)
                                              .withLabel ("dB")));
 
-    layout.add (std::make_unique<juce::AudioParameterInt> (
+    layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::polyphony), "Polyphony", 1, 16, 8));
 
-    layout.add (std::make_unique<juce::AudioParameterInt> (
+    layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::pitchBendRange), "Pitch Bend Range", 0, 24, 2,
         juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
             [] (int v, int) { return semitoneText ((float) v, 0); })));

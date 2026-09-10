@@ -13,15 +13,46 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 1 — esqueleto.** Plugin que compila, carga y suena: oscilador sierra
-PolyBLEP polifónico con ADSR exponencial, APVTS versionado, motor de voces
-propio con robo por edad y fade.
+**Fase 1 completa y verificada.** Plugin que compila, carga y suena: oscilador
+sierra PolyBLEP polifónico con ADSR exponencial, APVTS versionado, motor de
+voces propio con robo por edad y fade.
+
+Build limpio sin warnings, 2.105.387 aserciones en verde, y **pluginval
+strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
+buffer (32 a 2048).
+
+### Mediciones de la Fase 1
+
+Medido en el propio target de tests (`Tests/test_performance.cpp`), 48 kHz,
+buffer 128. Estos números son la línea de base para comparar contra las fases
+siguientes:
+
+| Voces | Factor tiempo real | CPU de un core | µs por bloque |
+|---:|---:|---:|---:|
+| 1 | 1445× | 0,07 % | 1,8 |
+| 4 | 797× | 0,13 % | 3,3 |
+| 8 | 476× | 0,21 % | 5,6 |
+| 16 | 255× | 0,39 % | 10,5 |
+
+Con 8 voces: 0,22 % a 48 kHz, 0,44 % a 96 kHz, 0,86 % a 192 kHz — escala lineal
+con el sample rate, como corresponde. En reposo cae a 0,058 % gracias al
+`SilenceGate`.
+
+Calidad del oscilador y del motor:
+
+| Medición | Resultado |
+|---|---|
+| Aliasing PolyBLEP vs sierra ingenua (C8, 48 kHz) | **−72,6 dB** vs −57,3 dB |
+| Salida con buffer 32 vs 512 | diferencia **0.000000000000** (bit a bit) |
+| Duración del stab a 44,1 / 48 / 96 / 192 kHz | 168,30 / 168,31 / 168,30 / 168,30 ms |
+| Salto máximo de muestra al robar voces | 0,52 (umbral 1,2) |
+| Salida en reposo | exactamente `0.0f` |
 
 Roadmap completo en [DECISIONS.md](DECISIONS.md).
 
 | Fase | Qué | Estado |
 |---|---|---|
-| 1 | Esqueleto: CMake, APVTS, sierra polifónica, tests, pluginval | en curso |
+| 1 | Esqueleto: CMake, APVTS, sierra polifónica, tests, pluginval | **completa** |
 | 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | — |
 | 3 | Carácter: osciladores, unísono, filtro SVF, drive | — |
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | — |

@@ -13,6 +13,7 @@ add_executable(STABR_Tests
     test_envelope.cpp
     test_oscillator.cpp
     test_processor.cpp
+    test_performance.cpp
 )
 
 target_link_libraries(STABR_Tests PRIVATE
