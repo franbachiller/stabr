@@ -44,14 +44,22 @@ function Assert-WindowsSdk {
     $root10 = (Get-ItemProperty -Path $key -Name KitsRoot10 -ErrorAction SilentlyContinue).KitsRoot10
 
     if (-not $root10 -or -not (Test-Path (Join-Path $root10 'Include'))) {
+        $pf86 = ${env:ProgramFiles(x86)}
+        $setup = Join-Path $pf86 'Microsoft Visual Studio\Installer\setup.exe'
+        $vsBt  = Join-Path $pf86 'Microsoft Visual Studio\2022\BuildTools'
+
         Write-Host ''
         Write-Host 'FALTA EL WINDOWS SDK.' -ForegroundColor Red
         Write-Host 'Corre esto en una terminal COMO ADMINISTRADOR:' -ForegroundColor Yellow
         Write-Host ''
-        Write-Host '  & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart --wait'
+        Write-Host "  & `"$setup`" modify --installPath `"$vsBt`" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart --wait"
         Write-Host ''
-        Write-Host 'Ojo: el verbo tiene que ser "modify", no "install". Con "install"'
-        Write-Host 'el instalador aborta con "ya se ha instalado" y no agrega nada.'
+        Write-Host 'Dos detalles que hacen fallar esto en silencio:' -ForegroundColor Yellow
+        Write-Host '  1. El verbo tiene que ser "modify", no "install". Con "install" el'
+        Write-Host '     instalador aborta con "ya se ha instalado", no agrega nada y'
+        Write-Host '     winget igual reporta exito.'
+        Write-Host '  2. El "&" del principio es obligatorio. Sin el, PowerShell trata la'
+        Write-Host '     ruta entre comillas como una cadena y tira ParserError en "modify".'
         Write-Host ''
         throw 'Windows SDK no encontrado.'
     }

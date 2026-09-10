@@ -192,6 +192,37 @@ Una sola función contamina el binario entero. Detalle completo en
 
 ---
 
+## D-018 · Fase 1 · La v1 sale VST3 / Windows. AU queda fuera de alcance.
+
+**Decisión:** el entregable de la v1 es **VST3 en Windows x64** (más Standalone
+para debug). El target AU sigue declarado en el CMake pero sólo se activa en
+macOS, y se documenta explícitamente como **no verificado**.
+
+**Motivo:** no hay acceso a una mac en este proyecto. AU no se puede compilar ni
+testear en Windows — el SDK de AudioUnit viene con Xcode y no existe fuera de
+macOS. Un target que nunca se compila no está "pendiente": está roto y todavía
+no lo sabemos. Prometerlo en el README sería mentir.
+
+Consecuencia comercial que hay que tener presente: macOS es una porción grande
+del mercado de producción musical. Salir sólo en Windows es una decisión de
+negocio, no un detalle técnico.
+
+**Caminos para revertirlo más adelante** (evaluar en Fase 7, no ahora):
+
+- **Runners macOS en CI** (GitHub Actions y equivalentes) — compilan y corren
+  pluginval sin tener la máquina. Es lo más barato. Limitación real: se puede
+  verificar que compila, carga y valida, pero **no se puede escuchar**, y un
+  plugin de audio que nadie escuchó en la plataforma destino no está probado.
+- **Mac alquilada por hora** (MacStadium, MacinCloud) para las sesiones de
+  verificación auditiva.
+- **Mac mini usado**, que a la larga sale más barato que lo anterior.
+
+En los tres casos hace falta además una cuenta de **Apple Developer (USD 99/año)**
+para firmar y notarizar; sin notarización, Gatekeeper bloquea el plugin en las
+máquinas de los usuarios. Detalle en [LICENSING.md](LICENSING.md).
+
+---
+
 ## Decisiones tomadas y pendientes de implementar
 
 Confirmadas con el usuario, se implementan en la fase que corresponde:

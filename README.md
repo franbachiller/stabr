@@ -1,6 +1,6 @@
 # STABR
 
-Máquina de stabs de house y techno. Instrumento VST3 (+ AU en macOS) que
+Máquina de stabs de house y techno. Instrumento **VST3 para Windows x64** que
 convierte una sola tecla en un acorde corto, percusivo y con carácter.
 
 **No es un sintetizador generalista.** Cada decisión responde a una sola
@@ -33,12 +33,23 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 
 ## Compilar
 
+### Plataformas
+
+| Formato | Plataforma | Estado |
+|---|---|---|
+| **VST3** | Windows x64 | entregable de la v1 |
+| Standalone | Windows x64 | sólo para debug |
+| AU | macOS | **fuera de alcance, sin verificar** |
+
+El target AU está declarado en el CMake y se activa solo en macOS, pero no hay
+mac en este proyecto: ese código **nunca se compiló**. No es un entregable.
+El porqué y los caminos para revertirlo están en [DECISIONS.md](DECISIONS.md) D-018.
+
 ### Requisitos
 
-- **Windows:** Visual Studio Build Tools 2022 con el workload
-  *Desktop development with C++* (incluye MSVC, CMake y el Windows SDK)
-- **macOS:** Xcode 15+
-- CMake 3.22+ (el que trae Visual Studio sirve)
+- Visual Studio Build Tools 2022 con el workload *Desktop development with C++*
+  (incluye MSVC, CMake y el Windows SDK)
+- CMake 3.22+ (el que trae Visual Studio sirve, no hace falta instalarlo aparte)
 
 JUCE se descarga sola vía `FetchContent`, pinneada al tag `8.0.15`. No hay que
 instalar nada aparte.
@@ -53,17 +64,15 @@ instalar nada aparte.
 
 El VST3 se copia solo a `C:\Program Files\Common Files\VST3`.
 
-> **Si el build falla por falta del Windows SDK**, el script te dice el comando
-> exacto. Ojo con esto: el verbo del instalador de Visual Studio tiene que ser
-> `modify`, no `install`. Con `install` aborta con *"ya se ha instalado"* y no
-> agrega nada, reportando éxito.
-
-### macOS / Linux
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-```
+> **Si el build falla por falta del Windows SDK**, el script te imprime el
+> comando exacto. Hay dos formas de que ese comando falle en silencio:
+>
+> - El verbo del instalador tiene que ser **`modify`**, no `install`. Con
+>   `install`, si Build Tools ya está instalado, aborta con *"ya se ha
+>   instalado"*, no agrega nada, y winget igual reporta éxito.
+> - En PowerShell el comando tiene que empezar con **`&`**. Sin él, la ruta
+>   entre comillas se interpreta como cadena y tira
+>   `ParserError: Token inesperado "modify"`.
 
 ---
 

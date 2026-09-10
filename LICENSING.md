@@ -100,10 +100,15 @@ material de marketing. Esto es independiente de la licencia del código.
   (USD 99/año)** para firmar y notarizar. Sin notarización, Gatekeeper bloquea
   el plugin en las máquinas de los usuarios.
 
-**Estado actual del proyecto:** el CMake activa el target AU solo en macOS. Sin
-acceso a una mac, ese código nunca se compila — o sea que en la práctica está
-sin verificar. **Pendiente de definir** si AU es un entregable real (requiere
-mac o CI con runners macOS) o si la v1 sale solo VST3 / Windows.
+**Estado actual del proyecto: AU está fuera de alcance para la v1.** No hay
+acceso a una mac, así que ese código nunca se compila y está sin verificar. El
+target sigue declarado en el CMake para no tener que rehacerlo el día que
+aparezca una máquina o un runner de CI con macOS, pero **no se promete como
+entregable**. Ver [DECISIONS.md](DECISIONS.md) D-018, que lista los caminos
+para revertirlo y lo que cuesta cada uno.
+
+Si algún día se distribuye en macOS, esta sección aplica y hay que sumar la
+cuenta de Apple Developer al presupuesto.
 
 ---
 
@@ -132,7 +137,7 @@ de embedding aparte. La licencia elegida se documenta acá.
 - [ ] Confirmar el tier de JUCE según facturación proyectada
 - [ ] Leer el EULA completo de JUCE 8 y confirmar el tema del splash screen
 - [ ] Revisar los lineamientos de marca VST de Steinberg para el material de marketing
-- [ ] Definir si sale AU (implica mac + Apple Developer + notarización)
+- [ ] (Si se decide sacar macOS) mac o CI con runners macOS, cuenta Apple Developer y notarización
 - [ ] Firma de código en Windows (certificado EV o el SmartScreen espanta usuarios)
 - [ ] Verificar la licencia de embedding de la tipografía de la GUI
 - [ ] Confirmar que no entró ningún código GPL/AGPL al árbol

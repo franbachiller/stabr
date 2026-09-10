@@ -20,11 +20,18 @@ include(FetchJUCE)
 include(Warnings)
 
 # ---------------------------------------------------------------------------
-# Formatos. AU solo existe en macOS (SDK de AudioUnit viene con Xcode).
+# Formatos.
+#
+# El target de entrega de la v1 es VST3 en Windows (ver DECISIONS.md D-018):
+# no hay acceso a una mac en este proyecto, asi que el codigo del wrapper AU
+# nunca se compila y por lo tanto esta SIN VERIFICAR. Se deja declarado para no
+# tener que reconstruir el CMake el dia que aparezca una mac o un runner de CI
+# con macOS, pero no se promete AU como entregable.
 # ---------------------------------------------------------------------------
 set(STABR_FORMATS VST3 Standalone)
 if(APPLE)
     list(APPEND STABR_FORMATS AU)
+    message(STATUS "STABR: macOS detectado, agregando target AU (sin verificar previamente)")
 endif()
 
 juce_add_plugin(STABR
