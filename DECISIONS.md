@@ -254,14 +254,86 @@ ni el rango, ni el mapeo de valores, así que no rompe estados guardados.
 
 ---
 
+## D-020 · Fase 2 · Polifonía = disparos simultáneos, no voces
+
+**Decisión:** el parámetro `polyphony` pasa de "1–16 voces" a **"1–8 disparos"**
+(acordes en modo Chord, notas sueltas en Passthrough). Default 6.
+
+**Motivo:** con un min9 de 5 notas, "8 voces" no le dice nada al usuario — no
+sabe si eso son dos acordes o uno y medio. **"Cuántos stabs se pueden
+superponer"** sí es una cantidad que se entiende y se decide. El pool de voces
+se dimensiona solo: 8 acordes × 7 notas + holgura.
+
+El ID `polyphony` se mantiene, pero **cambió el rango**, o sea que rompe estados
+guardados. Se puede hacer ahora porque nada está publicado; después de la v1
+esto sería inaceptable y habría que migrarlo en `state::migrate()`.
+
+---
+
+## D-021 · Fase 2 · Scale lock diatónico apilando GRADOS, no semitonos
+
+**Decisión:** en modo `Diatonic`, el acorde se arma apilando **grados de la
+escala** (0, 2, 4, 6… = terceras diatónicas), no semitonos fijos.
+
+**Motivo:** de ahí sale sola la calidad correcta en cada grado, sin una tabla de
+casos especiales. Apilar terceras sobre el grado I de menor natural da min7;
+sobre el III da maj7; sobre el VII da un dominante. Verificado: los siete grados
+de La menor dan Am7, Bm7♭5, Cmaj7, Dm7, Em7, Fmaj7, G7 — una tecla cada uno.
+
+El selector de acorde define entonces **densidad e intención** (¿tríada?
+¿séptima? ¿novena? ¿oncena?) y la tonalidad define la calidad. Esa es la
+promesa del scale lock: toques la tecla que toques, no puede sonar fuera de
+tonalidad. Hay un test que lo verifica sobre las 5 escalas × 12 tonalidades ×
+11 tipos × 25 notas.
+
+### Dos excepciones deliberadas
+
+`power` y `dim7` se marcan `alwaysLiteral`: en modo Diatonic se les cuantiza la
+fundamental, pero el acorde se arma con la receta literal.
+
+- **power** es una quinta justa por definición. Apilado por grados daría un
+  tritono en los grados de quinta disminuida (VII en mayor, II en frigio). Eso
+  no es un power chord con otro color: es un acorde roto.
+- **dim7** es simétrico (0-3-6-9) y no existe como acorde diatónico salvo en un
+  grado puntual del menor armónico. Forzarlo a la escala lo destruye.
+
+Los dos son acordes cuya identidad *son* sus intervalos, no su función.
+
+---
+
+## D-022 · Fase 2 · Al reducir densidad se saca la quinta, no la nota más aguda
+
+**Decisión:** cuando la densidad pedida es menor que las notas del acorde, se
+quita primero la **quinta** (índice 2 de la receta) y recién después se recorta
+por arriba.
+
+**Motivo:** recortar desde arriba le arranca la séptima a un min7 y lo deja como
+tríada menor — o sea, **otro acorde**. La quinta es la nota más prescindible:
+no define ni la calidad ni la extensión. Un min7 a 3 voces da `fundamental, ♭3,
+♭7`, que es el voicing de jazz de toda la vida, en vez de una tríada aburrida.
+
+---
+
+## D-023 · Fase 2 · La densidad mínima es 2, no 3
+
+**Decisión:** `kMinDensity = 2`.
+
+**Motivo:** apareció al escribir el test de las recetas literales, que pedía
+`power` (2 notas) y recibía 3. El mínimo de 3 hacía **imposible** un power chord
+de fundamental + quinta, que es el sonido de rave por excelencia, y también las
+díadas de techno. Era una restricción arbitraria que le sacaba sonidos al
+producto sin dar nada a cambio.
+
+---
+
 ## Decisiones tomadas y pendientes de implementar
 
 Confirmadas con el usuario, se implementan en la fase que corresponde:
 
 | Ref | Fase | Decisión |
 |---|---|---|
-| D-011 | 2 | **Scale lock con dos modos:** `Diatonic` (default — el selector de acorde define densidad/intención y la calidad la dicta la escala, nunca suena fuera de tonalidad) y `Literal` (el acorde es exacto, la escala sólo cuantiza la fundamental). |
-| D-012 | 2 | **Modo de nota explícito:** `Chord` (default) / `Passthrough` / `Auto`. `Auto` usa una ventana de recolección de ~20 ms y declara esa latencia; no es el default porque 20 ms de latencia al tocar en vivo es inaceptable. |
+| ~~D-011~~ | ~~2~~ | **Implementada.** Terminó con *tres* modos, no dos: `Off` (sin tonalidad, acorde literal sobre la nota tocada), `Diatonic` (default) y `Literal`. Faltaba `Off`: no todo el mundo quiere cuantizar. Detalle en D-021. |
+| ~~D-012~~ | ~~2~~ | **Implementada.** `Chord` (default) / `Passthrough` / `Auto`, con ventana de 20 ms y latencia declarada al host vía `NoteRouter::getLatencySamples()`. `setLatencySamples()` no se puede llamar desde el hilo de audio, así que el procesador publica el valor en un atómico y un `Timer` lo aplica en el hilo de mensajes. |
 | D-013 | 3 | **Drive por voz con oversampling ×2 (polyphase IIR)**, no ×4 FIR. La saturación global sí va ×4 FIR. Switch `HQ Mode` sube el drive por voz a ×4 para render offline. Motivo: ×4 por voz con 8 voces × 7 unísonos es CPU que no rinde; la fase no lineal del IIR es irrelevante porque cada voz se filtra y satura por separado. **A revisar con mediciones reales en Fase 3.** |
 | D-014 | 3 | **Presupuesto duro de osciladores** (arranca en 128). Cuando un acorde lo excede se baja el unísono por voz (7→5→3) en vez de tirar notas: perder densidad de detune es imperceptible, perder la novena del acorde es catastrófico. |
 | D-015 | 4 | **Línea de delay propia**, no `juce::dsp::DelayLine`: hace falta un punto de inserción dentro del lazo de feedback (HP/LP/saturación/band-pass del modo dub) y un puntero de lectura con slew propio para el pitch drift de cinta. Interpolación **Lagrange 3er orden** (lineal modula el brillo con el wow&flutter; allpass hace ruido con el puntero en movimiento). Dos comportamientos al cambiar el tiempo: `Tape` (slew, con drift) por defecto y `Digital` (crossfade). |

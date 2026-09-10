@@ -15,6 +15,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(STABR_BUILD_TESTS "Compilar el target de tests headless" ON)
 option(STABR_WERROR      "Tratar warnings como errores en targets propios" OFF)
 
+# Copiar el VST3 a la carpeta de plugins del sistema al terminar el build.
+# Se puede apagar: escribir en Program Files necesita permisos, y falla tambien
+# si un DAW tiene el plugin cargado y el archivo bloqueado. Apagarlo permite
+# compilar y correr los tests igual; el plugin queda en build/STABR_artefacts.
+option(STABR_COPY_PLUGIN "Copiar el plugin a la carpeta del sistema tras compilar" ON)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(FetchJUCE)
 include(Warnings)
@@ -51,7 +57,7 @@ juce_add_plugin(STABR
     NEEDS_MIDI_OUTPUT           FALSE
     IS_MIDI_EFFECT              FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD     TRUE
+    COPY_PLUGIN_AFTER_BUILD     ${STABR_COPY_PLUGIN}
 )
 
 # ---------------------------------------------------------------------------
@@ -64,6 +70,8 @@ target_sources(STABR PRIVATE
     Source/Params/ParameterLayout.cpp
     Source/DSP/Voice.cpp
     Source/DSP/VoiceManager.cpp
+    Source/Chord/ChordGenerator.cpp
+    Source/Chord/NoteRouter.cpp
 )
 
 target_include_directories(STABR PUBLIC Source)

@@ -12,7 +12,7 @@ void VoiceManager::prepare (double sr, int maximumBlockSize)
 
     // Reservado aca, jamas en processBlock.
     scratch.setSize (1, juce::jmax (1, maximumBlockSize), false, true, true);
-    stampCounter = 0;
+    reset();
 }
 
 void VoiceManager::reset() noexcept
@@ -20,8 +20,12 @@ void VoiceManager::reset() noexcept
     for (auto& v : voices)
         v.reset();
 
+    for (auto& s : slots)
+        s = {};
+
     scratch.clear();
     stampCounter = 0;
+    nextChordId  = 0;
 }
 
 void VoiceManager::setMaxPolyphony (int n) noexcept
@@ -47,14 +51,22 @@ void VoiceManager::setPitchBendSemitones (float semis) noexcept
         v.setPitchBendSemitones (semis);
 }
 
-int VoiceManager::countSoundingVoices() const noexcept
+//==============================================================================
+bool VoiceManager::hasVoicesFor (int chordId) const noexcept
 {
-    int n = 0;
     for (const auto& v : voices)
-        if (v.isActive() && ! v.isStealing())
-            ++n;
+        if (v.isActive() && v.getChordId() == chordId)
+            return true;
 
-    return n;
+    return false;
+}
+
+void VoiceManager::reapFinishedSlots() noexcept
+{
+    // Un slot soltado cuyas voces ya terminaron vuelve al pool de slots.
+    for (auto& s : slots)
+        if (s.chordId >= 0 && ! s.sounding && ! hasVoicesFor (s.chordId))
+            s = {};
 }
 
 Voice* VoiceManager::findFreeVoice() noexcept
@@ -66,88 +78,216 @@ Voice* VoiceManager::findFreeVoice() noexcept
     return nullptr;
 }
 
-Voice* VoiceManager::findVoiceToSteal() noexcept
+VoiceManager::ChordSlot* VoiceManager::findFreeSlot() noexcept
 {
-    // Prioridad 1: la voz en release mas vieja. Ya la estan soltando, robarla
-    // es lo menos audible.
-    Voice* best = nullptr;
+    for (auto& s : slots)
+        if (s.chordId < 0)
+            return &s;
+
+    return nullptr;
+}
+
+VoiceManager::ChordSlot* VoiceManager::findOldestSoundingSlot() noexcept
+{
+    ChordSlot* best = nullptr;
     std::uint64_t oldest = std::numeric_limits<std::uint64_t>::max();
 
-    for (auto& v : voices)
+    for (auto& s : slots)
     {
-        if (v.isActive() && ! v.isStealing() && v.isReleasing() && v.getStamp() < oldest)
+        if (s.chordId >= 0 && s.sounding && s.stamp < oldest)
         {
-            oldest = v.getStamp();
-            best   = &v;
-        }
-    }
-
-    if (best != nullptr)
-        return best;
-
-    // Prioridad 2: la voz sonando mas vieja.
-    oldest = std::numeric_limits<std::uint64_t>::max();
-    for (auto& v : voices)
-    {
-        if (v.isActive() && ! v.isStealing() && v.getStamp() < oldest)
-        {
-            oldest = v.getStamp();
-            best   = &v;
+            oldest = s.stamp;
+            best   = &s;
         }
     }
 
     return best;
 }
 
-void VoiceManager::noteOn (int midiNote, float velocity, int chordId) noexcept
+VoiceManager::ChordSlot* VoiceManager::findSlotForTrigger (int triggerNote) noexcept
 {
-    if (countSoundingVoices() >= maxPolyphony)
-        if (auto* victim = findVoiceToSteal())
-            victim->startSteal();
+    // El mas reciente primero: si la misma tecla se disparo dos veces, el
+    // note-off tiene que apagar el acorde nuevo, no el que ya venia decayendo.
+    ChordSlot* best = nullptr;
+    std::uint64_t newest = 0;
 
-    auto* v = findFreeVoice();
-
-    if (v == nullptr)
+    for (auto& s : slots)
     {
-        // El pool completo esta en fade. Caso patologico: se roba la mas vieja
-        // igual, aceptando el click, antes que perder la nota.
-        v = findVoiceToSteal();
-        if (v == nullptr)
-            return;
-
-        v->reset();
+        if (s.chordId >= 0 && s.sounding && s.triggerNote == triggerNote && s.stamp >= newest)
+        {
+            newest = s.stamp;
+            best   = &s;
+        }
     }
 
-    v->noteOn (midiNote, velocity, chordId, stampCounter++);
+    return best;
 }
 
-void VoiceManager::noteOff (int midiNote) noexcept
+void VoiceManager::stealChord (ChordSlot& slot) noexcept
+{
+    // Fade corto en TODAS las voces del acorde: se va entero o no se va.
+    for (auto& v : voices)
+        if (v.isActive() && v.getChordId() == slot.chordId)
+            v.startSteal();
+
+    slot = {};
+}
+
+void VoiceManager::releaseChord (ChordSlot& slot) noexcept
 {
     for (auto& v : voices)
-        if (v.isActive() && ! v.isStealing() && v.getNote() == midiNote)
+        if (v.isActive() && v.getChordId() == slot.chordId)
             v.noteOff();
+
+    // Deja de contar para la polifonia, pero el slot sigue reservado hasta que
+    // sus voces terminen de decaer (lo limpia reapFinishedSlots).
+    slot.sounding = false;
+}
+
+//==============================================================================
+void VoiceManager::noteOnChord (int triggerNote, const chord::ChordResult& notes, float velocity) noexcept
+{
+    if (notes.count <= 0)
+        return;
+
+    reapFinishedSlots();
+
+    // Retrigger de la misma tecla: el acorde anterior se suelta y decae solo.
+    // Superponer las colas es exactamente como suenan los stabs encadenados.
+    if (auto* previous = findSlotForTrigger (triggerNote))
+        releaseChord (*previous);
+
+    // Limite de polifonia: se libera lugar robando el acorde sonando mas viejo.
+    while (getSoundingChordCount() >= maxPolyphony)
+    {
+        auto* victim = findOldestSoundingSlot();
+
+        if (victim == nullptr)
+            break;
+
+        stealChord (*victim);
+    }
+
+    auto* slot = findFreeSlot();
+
+    if (slot == nullptr)
+    {
+        // Sin slots: se roba el mas viejo aunque este soltado.
+        ChordSlot* oldest = nullptr;
+        std::uint64_t oldestStamp = std::numeric_limits<std::uint64_t>::max();
+
+        for (auto& s : slots)
+        {
+            if (s.chordId >= 0 && s.stamp < oldestStamp)
+            {
+                oldestStamp = s.stamp;
+                oldest = &s;
+            }
+        }
+
+        if (oldest == nullptr)
+            return;
+
+        stealChord (*oldest);
+        slot = findFreeSlot();
+
+        if (slot == nullptr)
+            return;
+    }
+
+    const int chordId = nextChordId++;
+    const auto stamp  = stampCounter++;
+
+    slot->triggerNote = triggerNote;
+    slot->chordId     = chordId;
+    slot->stamp       = stamp;
+    slot->sounding    = true;
+
+    for (int i = 0; i < notes.count; ++i)
+    {
+        auto* v = findFreeVoice();
+
+        if (v == nullptr)
+        {
+            // El pool se quedo sin voces. Antes que dejar el acorde a medias
+            // (que suena peor que no tocarlo), se roba el acorde mas viejo que
+            // no sea este y se reintenta una vez.
+            ChordSlot* victim = nullptr;
+            std::uint64_t oldestStamp = std::numeric_limits<std::uint64_t>::max();
+
+            for (auto& s : slots)
+            {
+                if (s.chordId >= 0 && s.chordId != chordId && s.stamp < oldestStamp)
+                {
+                    oldestStamp = s.stamp;
+                    victim = &s;
+                }
+            }
+
+            if (victim != nullptr)
+            {
+                // startSteal deja las voces en fade, todavia activas: hay que
+                // reciclarlas de una para poder usarlas ahora.
+                const int victimId = victim->chordId;
+
+                for (auto& vv : voices)
+                    if (vv.isActive() && vv.getChordId() == victimId)
+                        vv.reset();
+
+                *victim = {};
+                v = findFreeVoice();
+            }
+
+            if (v == nullptr)
+                break;
+        }
+
+        v->noteOn (notes[i], velocity, chordId, stamp);
+    }
+}
+
+void VoiceManager::noteOnSingle (int midiNote, float velocity) noexcept
+{
+    chord::ChordResult single;
+    single.notes[0] = midiNote;
+    single.count = 1;
+
+    noteOnChord (midiNote, single, velocity);
+}
+
+void VoiceManager::noteOff (int triggerNote) noexcept
+{
+    if (auto* slot = findSlotForTrigger (triggerNote))
+        releaseChord (*slot);
 }
 
 void VoiceManager::allNotesOff (bool allowTailOff) noexcept
 {
-    for (auto& v : voices)
+    for (auto& s : slots)
     {
-        if (! v.isActive())
+        if (s.chordId < 0)
             continue;
 
         if (allowTailOff)
-            v.noteOff();
+            releaseChord (s);
         else
-            v.startSteal();
+            stealChord (s);
     }
+
+    if (! allowTailOff)
+        for (auto& v : voices)
+            if (v.isActive())
+                v.startSteal();
 }
 
+//==============================================================================
 void VoiceManager::renderAdd (juce::AudioBuffer<float>& buffer, int startSample, int numSamples) noexcept
 {
     if (numSamples <= 0)
         return;
 
     const int numChannels = buffer.getNumChannels();
+
     if (numChannels < 1)
         return;
 
@@ -161,7 +301,7 @@ void VoiceManager::renderAdd (juce::AudioBuffer<float>& buffer, int startSample,
     else
     {
         // Salida mono: el canal derecho va a un scratch que se descarta, para
-        // no sumar dos veces la señal en el unico canal real.
+        // no sumar dos veces la senal en el unico canal real.
         jassert (numSamples <= scratch.getNumSamples());
         right = scratch.getWritePointer (0);
         juce::FloatVectorOperations::clear (right, juce::jmin (numSamples, scratch.getNumSamples()));
@@ -171,9 +311,11 @@ void VoiceManager::renderAdd (juce::AudioBuffer<float>& buffer, int startSample,
         v.renderAdd (left, right, numSamples);
 }
 
+//==============================================================================
 int VoiceManager::getActiveVoiceCount() const noexcept
 {
     int n = 0;
+
     for (const auto& v : voices)
         if (v.isActive())
             ++n;
@@ -188,5 +330,64 @@ bool VoiceManager::hasActiveVoices() const noexcept
             return true;
 
     return false;
+}
+
+int VoiceManager::getSoundingChordCount() const noexcept
+{
+    int n = 0;
+
+    for (const auto& s : slots)
+        if (s.chordId >= 0 && s.sounding)
+            ++n;
+
+    return n;
+}
+
+chord::ChordResult VoiceManager::getSoundingNotes() const noexcept
+{
+    chord::ChordResult r;
+
+    // Solo el acorde sonando mas reciente: mostrar todas las colas superpuestas
+    // convertiria al visualizador en una sopa ilegible.
+    const ChordSlot* newest = nullptr;
+    std::uint64_t newestStamp = 0;
+
+    for (const auto& s : slots)
+        if (s.chordId >= 0 && s.sounding && s.stamp >= newestStamp)
+        {
+            newestStamp = s.stamp;
+            newest = &s;
+        }
+
+    if (newest == nullptr)
+        return r;
+
+    for (const auto& v : voices)
+    {
+        if (! v.isActive() || v.getChordId() != newest->chordId)
+            continue;
+
+        if (r.count >= chord::kMaxChordNotes)
+            break;
+
+        r.notes[(size_t) r.count++] = v.getNote();
+    }
+
+    // Orden ascendente: el visualizador espera las voces de grave a agudo.
+    for (int i = 1; i < r.count; ++i)
+    {
+        const int key = r.notes[(size_t) i];
+        int j = i - 1;
+
+        while (j >= 0 && r.notes[(size_t) j] > key)
+        {
+            r.notes[(size_t) (j + 1)] = r.notes[(size_t) j];
+            --j;
+        }
+
+        r.notes[(size_t) (j + 1)] = key;
+    }
+
+    return r;
 }
 }

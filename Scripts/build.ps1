@@ -16,7 +16,11 @@ param(
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo')]
     [string]$Config = 'Release',
     [switch]$Clean,
-    [switch]$Werror
+    [switch]$Werror,
+    # No copiar el VST3 a C:\Program Files\Common Files\VST3 al terminar.
+    # Necesario si un DAW tiene el plugin cargado (el archivo queda bloqueado)
+    # o si la shell no tiene permisos de escritura ahi.
+    [switch]$NoCopy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,8 +86,12 @@ if ($Clean -and (Test-Path $buildDir)) {
 }
 
 $werrorFlag = if ($Werror) { 'ON' } else { 'OFF' }
+$copyFlag   = if ($NoCopy) { 'OFF' } else { 'ON' }
 
-& $cmake -S $root -B $buildDir -G 'Visual Studio 17 2022' -A x64 "-DSTABR_WERROR=$werrorFlag"
+# Se pasan siempre explicitos para que sobrescriban lo que haya quedado en la
+# cache de CMake de un build anterior.
+& $cmake -S $root -B $buildDir -G 'Visual Studio 17 2022' -A x64 `
+         "-DSTABR_WERROR=$werrorFlag" "-DSTABR_COPY_PLUGIN=$copyFlag"
 if ($LASTEXITCODE -ne 0) { throw "Fallo la configuracion de CMake (exit $LASTEXITCODE)" }
 
 & $cmake --build $buildDir --config $Config --parallel

@@ -28,6 +28,18 @@ namespace stabr::pid
     // --- Oscilador (Fase 1: solo sierra; se expande en Fase 3) ---------------
     inline constexpr auto osc1Level   = "osc1_level";
 
+    // --- Motor de acordes (Fase 2) -------------------------------------------
+    inline constexpr auto chordType         = "chord_type";
+    inline constexpr auto chordVoicing      = "chord_voicing";
+    inline constexpr auto chordInversion    = "chord_inversion";
+    inline constexpr auto chordSpread       = "chord_spread";
+    inline constexpr auto chordDensity      = "chord_density";
+    inline constexpr auto chordOctaveDouble = "chord_octave_double";
+    inline constexpr auto scaleLock         = "scale_lock_mode";
+    inline constexpr auto scaleKey          = "scale_key";
+    inline constexpr auto scaleMode         = "scale_mode";
+    inline constexpr auto noteMode          = "note_mode";
+
     // --- Global ---------------------------------------------------------------
     inline constexpr auto masterGain      = "master_gain";
     inline constexpr auto polyphony       = "polyphony";
@@ -37,9 +49,6 @@ namespace stabr::pid
     /*  Espacio de nombres reservado para fases siguientes. Se declara aca para
         que nadie invente un ID incompatible mas adelante:
 
-        Fase 2 (acordes):  chord_type, chord_voicing, chord_inversion,
-                           chord_spread, chord_density, chord_octave_double,
-                           scale_lock_mode, scale_key, scale_mode, note_mode
         Fase 3 (caracter): osc1_wave, osc2_wave, osc2_level, osc2_detune,
                            osc2_octave, sub_level, sub_wave, uni_count,
                            uni_detune, uni_width, uni_phase_mode,

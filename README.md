@@ -13,34 +13,54 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 1 completa y verificada.** Plugin que compila, carga y suena: oscilador
-sierra PolyBLEP polifónico con ADSR exponencial, APVTS versionado, motor de
-voces propio con robo por edad y fade.
+**Fase 2 completa y verificada.** Una tecla dispara un acorde. Escalas con
+scale lock diatónico, 13 tipos de acorde, voicings, inversiones, densidad,
+spread, y tres modos de nota (Chord / Passthrough / Auto).
 
-Build limpio sin warnings, 2.105.387 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.154.986 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
 buffer (32 a 2048).
 
-### Mediciones de la Fase 1
+### El motor de acordes
+
+Con **scale lock en Diatonic** (el default), el acorde se arma apilando grados
+de la escala, no semitonos. La calidad sale sola de la tonalidad — una tecla
+por grado en La menor natural da:
+
+| Grado | Tecla | Acorde |
+|---|---|---|
+| I | A | Am7 |
+| II | B | Bm7♭5 |
+| III | C | Cmaj7 |
+| IV | D | Dm7 |
+| V | E | Em7 |
+| VI | F | Fmaj7 |
+| VII | G | G7 |
+
+Las teclas fuera de escala se cuantizan al grado más cercano, así que **no hay
+forma de tocar una nota fuera de tonalidad**. Verificado por test sobre
+5 escalas × 12 tonalidades × 11 tipos × 25 notas.
+
+`power` y `dim7` son excepciones deliberadas: mantienen sus intervalos exactos
+porque su identidad *son* sus intervalos. Detalle en [DECISIONS.md](DECISIONS.md) D-021.
+
+### Mediciones
 
 Medido en el propio target de tests (`Tests/test_performance.cpp`), 48 kHz,
-buffer 128. Estos números son la línea de base para comparar contra las fases
-siguientes:
+buffer 128:
 
-| Voces | Factor tiempo real | CPU de un core | µs por bloque |
+| Acordes | Voces | Factor tiempo real | CPU de un core |
 |---:|---:|---:|---:|
-| 1 | 1445× | 0,07 % | 1,8 |
-| 4 | 797× | 0,13 % | 3,3 |
-| 8 | 476× | 0,21 % | 5,6 |
-| 16 | 255× | 0,39 % | 10,5 |
+| 1 | 4 | 560× | 0,18 % |
+| 4 | 16 | 228× | 0,44 % |
+| 8 | 32 | 131× | 0,76 % |
+| 8 (densidad 7) | 56 | — | **1,27 %** |
 
-Con 8 voces: 0,22 % a 48 kHz, 0,44 % a 96 kHz, 0,86 % a 192 kHz — escala lineal
-con el sample rate, como corresponde. En reposo cae a 0,058 % gracias al
+Peor caso absoluto: 8 acordes × 7 voces = 56 voces sonando, 1,27 % de un core.
+A 96 kHz sube a 1,52 %, a 192 kHz a 3,06 %. En reposo cae a 0,12 % gracias al
 `SilenceGate`.
 
-Calidad del oscilador y del motor:
-
-| Medición | Resultado |
+| Calidad | Resultado |
 |---|---|
 | Aliasing PolyBLEP vs sierra ingenua (C8, 48 kHz) | **−72,6 dB** vs −57,3 dB |
 | Salida con buffer 32 vs 512 | diferencia **0.000000000000** (bit a bit) |
@@ -53,7 +73,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 | Fase | Qué | Estado |
 |---|---|---|
 | 1 | Esqueleto: CMake, APVTS, sierra polifónica, tests, pluginval | **completa** |
-| 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | — |
+| 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | **completa** |
 | 3 | Carácter: osciladores, unísono, filtro SVF, drive | — |
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | — |
 | 5 | Secuenciador: gate rítmico, swing, sync al host | — |
@@ -91,9 +111,13 @@ instalar nada aparte.
 .\Scripts\build.ps1              # Release
 .\Scripts\build.ps1 -Config Debug
 .\Scripts\build.ps1 -Clean
+.\Scripts\build.ps1 -NoCopy      # sin instalar en el sistema
 ```
 
-El VST3 se copia solo a `C:\Program Files\Common Files\VST3`.
+El VST3 se copia solo a `C:\Program Files\Common Files\VST3`. Si esa copia falla
+—porque un DAW tiene el plugin cargado y el archivo queda bloqueado, o porque la
+shell no tiene permisos ahí— usá `-NoCopy`: compila y los tests corren igual, y
+el plugin queda en `build/STABR_artefacts/`.
 
 > **Si el build falla por falta del Windows SDK**, el script te imprime el
 > comando exacto. Tres formas de que ese comando falle:
@@ -144,9 +168,10 @@ Source/
   PluginProcessor.*     procesador principal, dispatch de MIDI por sub-bloque
   PluginEditor.*        GUI placeholder (se tira entera en Fase 6)
   Params/               IDs estables y layout de parámetros
-  DSP/                  voces, osciladores, envolventes
+  DSP/                  voces, osciladores, envolventes, robo por acorde
   Common/               utilidades compartidas (silencio, versionado de estado)
-  Chord/ FX/ Sequencer/ GUI/    fases 2 a 6
+  Chord/                generador de acordes, escalas y ruteo de notas
+  FX/ Sequencer/ GUI/   fases 4 a 6
 Tests/                  tests headless
 Scripts/                build y validación
 cmake/                  JUCE pinneada, flags de warnings

@@ -1,6 +1,8 @@
 #include "ParameterLayout.h"
 #include "ParameterIDs.h"
 #include "DiscreteIntParameter.h"
+#include "../Chord/ChordTypes.h"
+#include "../DSP/VoiceManager.h"
 
 namespace stabr
 {
@@ -47,6 +49,20 @@ namespace
         const auto n = juce::roundToInt (v);
         return juce::String (n) + (std::abs (n) == 1 ? " semitono" : " semitonos");
     }
+
+    /*  Los nombres viven en Chord/ChordTypes.h, que es C++ puro y no conoce
+        JUCE. Aca se convierten una sola vez, para que el layout de parametros
+        y la GUI no puedan desincronizarse de las tablas del motor. */
+    template <size_t N>
+    juce::StringArray toStringArray (const std::array<const char*, N>& names)
+    {
+        juce::StringArray a;
+
+        for (auto* n : names)
+            a.add (juce::String (juce::CharPointer_UTF8 (n)));
+
+        return a;
+    }
 }
 
 APVTS::ParameterLayout createParameterLayout()
@@ -85,6 +101,54 @@ APVTS::ParameterLayout createParameterLayout()
         juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.8f,
         juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
 
+    // --- Motor de acordes -----------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::chordType), "Chord Type",
+        toStringArray (chord::chordTypeNames),
+        (int) chord::ChordType::min7));       // el acorde de house por excelencia
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::scaleLock), "Scale Lock",
+        toStringArray (chord::scaleLockNames),
+        (int) chord::ScaleLock::diatonic));   // ver DECISIONS.md D-011
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::scaleKey), "Key",
+        toStringArray (chord::keyNames), 9));  // La
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::scaleMode), "Scale",
+        toStringArray (chord::scaleModeNames),
+        (int) chord::ScaleMode::naturalMinor));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::noteMode), "Note Mode",
+        toStringArray (chord::noteModeNames),
+        (int) chord::NoteMode::chord));       // ver DECISIONS.md D-012
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::chordVoicing), "Voicing",
+        toStringArray (chord::voicingNames),
+        (int) chord::VoicingType::closed));
+
+    layout.add (std::make_unique<DiscreteIntParameter> (
+        makeID (pid::chordInversion), "Inversion", 0, 3, 0));
+
+    layout.add (std::make_unique<DiscreteIntParameter> (
+        makeID (pid::chordSpread), "Spread", 0, 3, 0,
+        juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
+            [] (int v, int) { return v == 0 ? juce::String ("Off")
+                                            : juce::String (v) + " oct"; })));
+
+    layout.add (std::make_unique<DiscreteIntParameter> (
+        makeID (pid::chordDensity), "Density",
+        chord::kMinDensity, chord::kMaxDensity, 4,
+        juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
+            [] (int v, int) { return juce::String (v) + " voces"; })));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::chordOctaveDouble), "Octave Down", false));
+
     // --- Global ---------------------------------------------------------------
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         makeID (pid::masterGain), "Master Gain",
@@ -92,8 +156,14 @@ APVTS::ParameterLayout createParameterLayout()
         juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (dbText)
                                              .withLabel ("dB")));
 
+    /*  Polifonia = disparos simultaneos (acordes en modo Chord, notas sueltas
+        en Passthrough), no voces. Con un min9 de 5 notas, "8 voces" no
+        significaba nada para el usuario; "cuantos stabs se pueden superponer"
+        si. Ver DECISIONS.md D-020. */
     layout.add (std::make_unique<DiscreteIntParameter> (
-        makeID (pid::polyphony), "Polyphony", 1, 16, 8));
+        makeID (pid::polyphony), "Polyphony", 1, VoiceManager::kMaxPolyphony, 6,
+        juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
+            [] (int v, int) { return juce::String (v) + (v == 1 ? " acorde" : " acordes"); })));
 
     layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::pitchBendRange), "Pitch Bend Range", 0, 24, 2,
