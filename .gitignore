@@ -1,0 +1,28 @@
+# Build
+build/
+build-*/
+out/
+cmake-build-*/
+_deps/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+CMakeUserPresets.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Artefactos
+*.vst3
+*.component
+*.exe
+*.dll
+*.pdb
+Tools/pluginval*
+Tools/JUCE-*/
