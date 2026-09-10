@@ -65,7 +65,7 @@ instalar nada aparte.
 El VST3 se copia solo a `C:\Program Files\Common Files\VST3`.
 
 > **Si el build falla por falta del Windows SDK**, el script te imprime el
-> comando exacto. Hay dos formas de que ese comando falle en silencio:
+> comando exacto. Tres formas de que ese comando falle:
 >
 > - El verbo del instalador tiene que ser **`modify`**, no `install`. Con
 >   `install`, si Build Tools ya está instalado, aborta con *"ya se ha
@@ -73,6 +73,9 @@ El VST3 se copia solo a `C:\Program Files\Common Files\VST3`.
 > - En PowerShell el comando tiene que empezar con **`&`**. Sin él, la ruta
 >   entre comillas se interpreta como cadena y tira
 >   `ParserError: Token inesperado "modify"`.
+> - **No uses `--wait`**: no existe en el instalador 4.10 y aborta con
+>   `exit 87`. Sin `--wait` el comando devuelve el prompt enseguida y la
+>   instalación sigue en segundo plano; usá `--passive` para ver el progreso.
 
 ---
 

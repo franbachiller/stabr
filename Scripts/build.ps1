@@ -52,14 +52,17 @@ function Assert-WindowsSdk {
         Write-Host 'FALTA EL WINDOWS SDK.' -ForegroundColor Red
         Write-Host 'Corre esto en una terminal COMO ADMINISTRADOR:' -ForegroundColor Yellow
         Write-Host ''
-        Write-Host "  & `"$setup`" modify --installPath `"$vsBt`" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart --wait"
+        Write-Host "  & `"$setup`" modify --installPath `"$vsBt`" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
         Write-Host ''
-        Write-Host 'Dos detalles que hacen fallar esto en silencio:' -ForegroundColor Yellow
+        Write-Host 'Tres detalles que hacen fallar esto:' -ForegroundColor Yellow
         Write-Host '  1. El verbo tiene que ser "modify", no "install". Con "install" el'
         Write-Host '     instalador aborta con "ya se ha instalado", no agrega nada y'
         Write-Host '     winget igual reporta exito.'
         Write-Host '  2. El "&" del principio es obligatorio. Sin el, PowerShell trata la'
         Write-Host '     ruta entre comillas como una cadena y tira ParserError en "modify".'
+        Write-Host '  3. NO uses --wait: no existe en el instalador 4.10 y aborta con'
+        Write-Host '     exit 87. Sin --wait el comando vuelve enseguida y la instalacion'
+        Write-Host '     sigue en segundo plano; --passive te muestra el progreso.'
         Write-Host ''
         throw 'Windows SDK no encontrado.'
     }
