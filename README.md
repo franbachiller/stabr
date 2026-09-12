@@ -107,6 +107,12 @@ instalar nada aparte.
 
 ### Windows
 
+La forma facil: doble clic en **`Compilar e instalar STABR.bat`** (en
+`Scripts/`, o copiado al escritorio). Se eleva solo pidiendo UAC —lo necesita
+para escribir en `Program Files`—, compila en Release e instala el VST3.
+
+O desde PowerShell:
+
 ```powershell
 .\Scripts\build.ps1              # Release
 .\Scripts\build.ps1 -Config Debug
@@ -173,7 +179,7 @@ Source/
   Chord/                generador de acordes, escalas y ruteo de notas
   FX/ Sequencer/ GUI/   fases 4 a 6
 Tests/                  tests headless
-Scripts/                build y validación
+Scripts/                build, validación y el .bat de instalación
 cmake/                  JUCE pinneada, flags de warnings
 ```
 
