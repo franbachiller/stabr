@@ -1,12 +1,19 @@
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "Common/Utf8.h"
 
 namespace stabr
 {
 StabrEditor::StabrEditor (StabrProcessor& p)
     : juce::AudioProcessorEditor (&p), proc (p)
 {
-    title.setText ("STABR  \xc2\xb7  fase 1 (placeholder)", juce::dontSendNotification);
+    /*  El numero de version sale del CMake, no de un literal: la primera
+        version de esto decia "fase 1" hardcodeado y quedo mintiendo despues de
+        la Fase 2. Un texto que hay que acordarse de actualizar a mano siempre
+        termina desactualizado. */
+    title.setText (utf8 ("STABR  \xc2\xb7  v") + JucePlugin_VersionString
+                       + utf8 ("  \xc2\xb7  UI placeholder"),
+                   juce::dontSendNotification);
     title.setFont (juce::FontOptions (18.0f, juce::Font::bold));
     title.setJustificationType (juce::Justification::centredLeft);
     addAndMakeVisible (title);

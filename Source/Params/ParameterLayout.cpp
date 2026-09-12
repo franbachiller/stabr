@@ -3,6 +3,7 @@
 #include "DiscreteIntParameter.h"
 #include "../Chord/ChordTypes.h"
 #include "../DSP/VoiceManager.h"
+#include "../Common/Utf8.h"
 
 namespace stabr
 {
@@ -59,7 +60,7 @@ namespace
         juce::StringArray a;
 
         for (auto* n : names)
-            a.add (juce::String (juce::CharPointer_UTF8 (n)));
+            a.add (utf8 (n));
 
         return a;
     }

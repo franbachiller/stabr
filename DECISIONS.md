@@ -339,3 +339,56 @@ Confirmadas con el usuario, se implementan en la fase que corresponde:
 | D-015 | 4 | **Línea de delay propia**, no `juce::dsp::DelayLine`: hace falta un punto de inserción dentro del lazo de feedback (HP/LP/saturación/band-pass del modo dub) y un puntero de lectura con slew propio para el pitch drift de cinta. Interpolación **Lagrange 3er orden** (lineal modula el brillo con el wow&flutter; allpass hace ruido con el puntero en movimiento). Dos comportamientos al cambiar el tiempo: `Tape` (slew, con drift) por defecto y `Digital` (crossfade). |
 | D-016 | 4 | **Reverb FDN 8×8 con matriz Hadamard** + difusor de entrada tipo Dattorro, en vez de Dattorro puro. Un solo motor cubre plate/room/hall escalando largos de línea y ganancias desde RT60. Riesgo conocido: un FDN mal parametrizado hace flutter metálico — mitigación con largos primos entre sí, modulación independiente por línea y damping por realimentación. Plan B si no suena: Dattorro para plate + FDN para room/hall. |
 | D-017 | 5 | **El secuenciador latchea:** apretás una tecla, la soltás, y sigue disparando ese acorde. Si no hay nada apretado, cae a la fundamental de la tonalidad. Sin esto no se cumple la promesa de sacar un stab en 30 segundos. |
+
+---
+
+## D-024 · Fase 2 · Todo texto no-ASCII pasa por `utf8()`
+
+**Decisión:** existe `Source/Common/Utf8.h` con un helper `utf8(const char*)`, y
+**todo** literal de texto visible que no sea ASCII de 7 bits pasa por ahí.
+
+**El problema:** `juce::String (const char*)` **no interpreta UTF-8**. Verificado
+en el código de JUCE 8.0.15 (`juce_String.cpp:307`):
+
+```cpp
+String::String (const char* const t)
+    : text (StringHolderUtils::createFromCharPointer (CharPointer_ASCII (t)))
+```
+
+`CharPointer_ASCII` mapea cada byte a su mismo code point, así que los dos
+bytes de `·` (`C2 B7`) se convierten en `Â` + `·`. Igual pasa con cualquier
+acento: "Inversión" sale "InversiÃ³n".
+
+**Cómo apareció:** el usuario mandó una captura de la GUI donde el título decía
+`STABR Â· fase 1`. Compila sin errores y **sin warnings**: JUCE tiene un
+`jassert` para este caso, pero en Release está compilado fuera, así que en un
+build de Release es completamente silencioso.
+
+**Test de regresión** en `test_processor.cpp`: recorre los nombres, unidades y
+textos de valor de todos los parámetros, **y además camina el árbol de
+componentes del editor** buscando U+00C2 y U+00C3, que son la firma de este
+error y no aparecen en ninguna palabra real.
+
+Dos cosas que casi hacen que el test no sirviera, y que valen como recordatorio:
+
+1. La primera versión escribía el patrón buscado como literal `"ÂÃ"` — que
+   habría tenido **exactamente el mismo bug** que busca, y nunca habría
+   coincidido. Se construye por code point.
+2. La primera versión sólo revisaba parámetros. El bug original estaba en un
+   `Label` del editor, así que habría dejado pasar justo el caso que lo motivó.
+
+**El test se verificó rompiendo el título a propósito y confirmando que falla**
+con el mensaje `el Label en editor/0 tiene UTF-8 roto: "STABR  Â·  v0.2.0..."`.
+Un test de regresión que nunca se vio fallar no prueba nada.
+
+---
+
+## D-025 · Fase 2 · El título del editor sale de la versión, no de un literal
+
+**Decisión:** el placeholder muestra `JucePlugin_VersionString`, que viene del
+`project(STABR VERSION ...)` del CMake. La versión pasa a **0.2.0**.
+
+**Motivo:** decía `fase 1` hardcodeado y siguió diciéndolo después de terminar
+la Fase 2 — el usuario lo notó y preguntó si el plugin se había actualizado.
+Un texto que hay que acordarse de cambiar a mano siempre termina mintiendo, y
+en este caso mentía sobre algo que importa: qué versión está cargada.

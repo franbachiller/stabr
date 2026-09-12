@@ -5,6 +5,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <functional>
 
 namespace
 {
@@ -310,6 +311,91 @@ public:
 
             expectEquals ((int) proc.getAPVTS().state.getProperty (state::versionProperty),
                           state::kCurrentVersion);
+        }
+
+        beginTest ("ningun texto visible tiene UTF-8 mal decodificado");
+        {
+            /*  juce::String (const char*) NO interpreta UTF-8: trata cada byte
+                como Latin-1. Un literal con acentos o simbolos sale roto y el
+                compilador no dice nada. Paso de verdad en la v0.1: el titulo
+                del editor mostraba "STABR Â· fase 1" en pantalla.
+
+                "Â" y "Ã" son la firma de ese error: son como se ven los bytes
+                iniciales de una secuencia UTF-8 leidos como Latin-1. Ninguna
+                palabra real en espanol ni en ingles los contiene.
+                Ver Source/Common/Utf8.h
+            */
+            StabrProcessor proc;
+            proc.setPlayConfigDetails (0, 2, 48000.0, 512);
+            proc.prepareToPlay (48000.0, 512);
+
+            /*  Construido por code point a proposito: escribir "ÂÃ" como
+                literal en este archivo tendria exactamente el mismo bug que el
+                test busca, y no coincidiria nunca.
+                U+00C2 y U+00C3 son los dos bytes iniciales de las secuencias
+                UTF-8 mas comunes, leidos como Latin-1. */
+            const juce::String mojibake =
+                  juce::String::charToString ((juce::juce_wchar) 0x00C2)
+                + juce::String::charToString ((juce::juce_wchar) 0x00C3);
+
+            auto check = [this, &mojibake] (const juce::String& s, const juce::String& where)
+            {
+                if (s.containsAnyOf (mojibake))
+                {
+                    expect (false, where + " tiene UTF-8 roto: \"" + s + "\"");
+                    return false;
+                }
+
+                return true;
+            };
+
+            bool clean = true;
+
+            for (auto* param : proc.getParameters())
+            {
+                auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (param);
+
+                if (ranged == nullptr)
+                    continue;
+
+                const auto id = ranged->getParameterID();
+
+                clean &= check (ranged->getName (128), "el nombre de " + id);
+                clean &= check (ranged->getLabel(), "la unidad de " + id);
+
+                // Los textos de valor, barriendo todo el recorrido del control.
+                for (int step = 0; step <= 20; ++step)
+                    clean &= check (ranged->getText ((float) step / 20.0f, 128),
+                                    "un valor de " + id);
+            }
+
+            /*  Y el editor. El bug original NO estaba en un parametro sino en
+                el titulo, que es un Label: revisar solo parametros habria
+                dejado pasar exactamente el caso que motivo este test. */
+            if (auto* editor = proc.createEditor())
+            {
+                std::function<void (juce::Component&, const juce::String&)> walk =
+                    [&] (juce::Component& c, const juce::String& path)
+                    {
+                        clean &= check (c.getTitle(), "el titulo accesible de " + path);
+
+                        if (auto* label = dynamic_cast<juce::Label*> (&c))
+                            clean &= check (label->getText(), "el Label en " + path);
+
+                        if (auto* button = dynamic_cast<juce::Button*> (&c))
+                            clean &= check (button->getButtonText(), "el Button en " + path);
+
+                        for (int i = 0; i < c.getNumChildComponents(); ++i)
+                            if (auto* child = c.getChildComponent (i))
+                                walk (*child, path + "/" + juce::String (i));
+                    };
+
+                walk (*editor, "editor");
+                delete editor;
+            }
+
+            if (clean)
+                expect (true);
         }
 
         beginTest ("el robo de voces no genera clicks");
