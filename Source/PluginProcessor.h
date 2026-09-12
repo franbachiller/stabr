@@ -7,6 +7,7 @@
 #include "Chord/ChordGenerator.h"
 #include "Chord/NoteRouter.h"
 #include "Params/ParamCache.h"
+#include "FX/FxChain.h"
 
 namespace stabr
 {
@@ -46,6 +47,7 @@ public:
 
     /*  Para el visualizador de acordes de la Fase 6. */
     chord::ChordResult getSoundingNotes() const noexcept { return voices.getSoundingNotes(); }
+    fx::FxChain& getFxChain() noexcept { return fxChain; }
 
     /*  Solo para tests y mediciones: no llamar desde la GUI sin un FIFO. */
     int getActiveVoiceCount() const noexcept { return voices.getActiveVoiceCount(); }
@@ -62,6 +64,8 @@ private:
 
     VoiceManager voices;
     NoteRouter router;
+    fx::FxChain fxChain;
+    fx::FxParams fxParams;
     NoteRouter::EventList events;
     chord::ChordParams chordParams;
     VoiceParams voiceParams;
@@ -70,6 +74,10 @@ private:
     juce::SmoothedValue<float> masterGainSmoothed;
 
     float currentBendNormalised = 0.0f;   // -1..1
+
+    // Ultimo tempo valido del host: si deja de informarlo, se sigue usando
+    // este en vez de caer a cero y hacer explotar las divisiones.
+    double lastKnownBpm = 120.0;
 
     /*  El modo Auto introduce latencia y hay que declararsela al host, pero
         setLatencySamples() no se puede llamar desde el hilo de audio. El

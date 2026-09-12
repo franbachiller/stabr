@@ -84,6 +84,16 @@ public:
 
             juce::AudioBuffer<float> buffer (2, 256);
 
+            /*  Desde la Fase 4 hay que APAGAR los efectos para que este test
+                siga midiendo lo que dice medir: que la VOZ se apague. Con el
+                delay y la reverb activos, la cola dura decenas de segundos y el
+                test estaria midiendo el SilenceGate, no la envolvente.
+                El silencio con colas se verifica aparte, en test_fx.cpp. */
+            auto& apvts = proc.getAPVTS();
+            apvts.getParameter (pid::delayMix)->setValueNotifyingHost (0.0f);
+            apvts.getParameter (pid::reverbMix)->setValueNotifyingHost (0.0f);
+            apvts.getParameter (pid::chorusMix)->setValueNotifyingHost (0.0f);
+
             auto midi = makeNoteOn (60, 1.0f, 0);
             buffer.clear();
             proc.processBlock (buffer, midi);
@@ -452,6 +462,15 @@ private:
         StabrProcessor proc;
         proc.setPlayConfigDetails (0, 2, sr, blockSize);
         proc.prepareToPlay (sr, blockSize);
+
+        /*  Efectos apagados: este helper mide la VOZ. Con delay y reverb
+            activos mediria tambien sus colas, y ademas el wow & flutter
+            introduce variacion que no tiene nada que ver con lo que se
+            compara. */
+        auto& apvts = proc.getAPVTS();
+        apvts.getParameter (pid::delayMix)->setValueNotifyingHost (0.0f);
+        apvts.getParameter (pid::reverbMix)->setValueNotifyingHost (0.0f);
+        apvts.getParameter (pid::chorusMix)->setValueNotifyingHost (0.0f);
 
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> out;

@@ -336,8 +336,8 @@ Confirmadas con el usuario, se implementan en la fase que corresponde:
 | ~~D-012~~ | ~~2~~ | **Implementada.** `Chord` (default) / `Passthrough` / `Auto`, con ventana de 20 ms y latencia declarada al host vía `NoteRouter::getLatencySamples()`. `setLatencySamples()` no se puede llamar desde el hilo de audio, así que el procesador publica el valor en un atómico y un `Timer` lo aplica en el hilo de mensajes. |
 | ~~D-013~~ | ~~3~~ | **Implementada y validada con datos**, con una corrección: el filtro terminó siendo **FIR halfband generado**, no IIR polifásico (ver D-031). ×2 por voz + ×4 en HQ. La medición confirma la decisión: ×2 mejora **14 dB** de aliasing y ×4 llega a **26 dB** en agudos con drive a tope. Costo real del peor caso: 14,0 % sin drive, 41,2 % con ×2, **91,7 % con ×4**. HQ es para render offline, no para tocar en vivo, y así está documentado. |
 | ~~D-014~~ | ~~3~~ | **Implementada, con dos correcciones que aparecieron al medir.** (1) El presupuesto es un techo **blando**, no duro: nunca se dejan acordes incompletos, así que el mínimo de 1 unísono por voz puede pasarlo (256 de presupuesto, 322 osciladores medidos en el peor caso). (2) **No controla el costo del drive**, que escala con VOCES y no con osciladores: subir el unísono de 1 a 7 sube de 11,1 % a 14,0 %, mientras que encender el drive salta a 41,2 %. La palanca para el drive es la polifonía, no el unísono. El presupuesto arranca en 256, no en 128: con 128 se quedaba corto para un acorde de 7 notas con unísono 7. |
-| D-015 | 4 | **Línea de delay propia**, no `juce::dsp::DelayLine`: hace falta un punto de inserción dentro del lazo de feedback (HP/LP/saturación/band-pass del modo dub) y un puntero de lectura con slew propio para el pitch drift de cinta. Interpolación **Lagrange 3er orden** (lineal modula el brillo con el wow&flutter; allpass hace ruido con el puntero en movimiento). Dos comportamientos al cambiar el tiempo: `Tape` (slew, con drift) por defecto y `Digital` (crossfade). |
-| D-016 | 4 | **Reverb FDN 8×8 con matriz Hadamard** + difusor de entrada tipo Dattorro, en vez de Dattorro puro. Un solo motor cubre plate/room/hall escalando largos de línea y ganancias desde RT60. Riesgo conocido: un FDN mal parametrizado hace flutter metálico — mitigación con largos primos entre sí, modulación independiente por línea y damping por realimentación. Plan B si no suena: Dattorro para plate + FDN para room/hall. |
+| ~~D-015~~ | ~~4~~ | **Implementada y verificada.** Línea propia con Lagrange-3 y puntero deslizante. El impulso sale en la muestra **exacta** (480, 6000, 18000, 48000 medidas) y la interpolación distorsiona **−240 dB** con retardo fraccionario. Los dos modos de cambio de tiempo funcionan: `Tape` desliza (glissando) y `Digital` salta con crossfade. |
+| ~~D-016~~ | ~~4~~ | **Implementada y verificada.** FDN 8×8 Hadamard con difusor Dattorro al frente. Las tres mitigaciones del flutter están puestas (largos primos entre sí, modulación independiente por línea, damping por realimentación) y **no hizo falta el plan B**: los tres modos quedan estables con decay y size al máximo (pico 0,900, sin divergencia en 15 s), el decay controla la cola de 0,43 a 5,18 s, y la salida es estéreo de verdad. |
 | D-017 | 5 | **El secuenciador latchea:** apretás una tecla, la soltás, y sigue disparando ese acorde. Si no hay nada apretado, cae a la fundamental de la tonalidad. Sin esto no se cumple la promesa de sacar un stab en 30 segundos. |
 
 ---
@@ -540,3 +540,122 @@ los tres errores son fáciles de repetir:
 
 Recién con las tres cosas bien la medición mostró lo que dice D-013: ×2 mejora
 **14 dB** y ×4 mejora **26 dB** en agudos con drive a tope.
+
+---
+
+## D-033 · Fase 4 · El orden de las divisiones musicales no es el intuitivo
+
+**Decisión:** la lista de divisiones va estrictamente creciente en duración, con
+tresillos y punteados **intercalados**, no agrupados por división.
+
+**Motivo:** agruparlos (1/16T, 1/16, 1/16., después 1/8T…) parece lo natural y
+**está mal**: un tresillo de corchea (0,333 negras) es más **corto** que una
+semicorchea con puntillo (0,375). Con la lista agrupada, girar el control del
+tiempo de delay a veces lo acortaba en vez de alargarlo.
+
+Lo encontró el test que verifica la monotonía, no la lectura del código. El
+orden correcto es:
+
+```
+1/64 · 1/32T · 1/32 · 1/16T · 1/16 · 1/8T · 1/16. · 1/8 · 1/4T · 1/8.
+1/4 · 1/2T · 1/4. · 1/2 · 1/2. · 1 · 2 · 3 · 4 compases
+```
+
+`1/8.` es 3/16, EL tiempo de delay del dub techno, y hay un test que verifica
+que dé exactamente lo mismo que tres semicorcheas.
+
+---
+
+## D-034 · Fase 4 · El freeze saltea los filtros del lazo
+
+**Decisión:** con `freeze` activo, la realimentación del delay **no** pasa por
+el pasaaltos ni el pasabajos.
+
+**Motivo:** cada vuelta por esos filtros saca un poco de energía en los bordes
+de la banda. En uso normal eso es exactamente lo que hace que las repeticiones
+se disuelvan — es la razón por la que existen. Pero en freeze el material da
+cientos de vueltas y las pérdidas se acumulan hasta apagarlo.
+
+El test lo midió: con los filtros en el lazo, el freeze caía a **RMS 0,0002 en
+30 segundos**. Un freeze tiene que *sostener*, no filtrar lentamente hasta el
+silencio. Ahora sostiene en 0,0997 indefinidamente, acotado por el saturador
+del lazo.
+
+---
+
+## D-035 · Fase 4 · Los graves se monofican filtrando el LATERAL, no partiendo bandas
+
+**Decisión:** el mono de graves se hace con un pasaaltos de 12 dB/oct sobre la
+señal **side** de una descomposición M/S. El **mid pasa entero, sin filtrar**.
+
+**La versión equivocada** (el primer intento): partir en dos bandas con un
+pasabajos, sumar la grave a mono y recombinar.
+
+```cpp
+low  = LP(x);  high = x - low;     // <-- esto no es un complemento limpio
+```
+
+Un filtro de un polo **desfasa**, así que `x - LP(x)` no es el complemento
+exacto: en la zona del cruce las dos bandas no suman a la señal original. El
+test lo midió con una señal en contrafase: a 50 Hz, con el corte en 120 Hz,
+**el 38 % seguía saliendo por la banda "alta"**, o sea sin monoficar.
+
+Filtrando sólo el lateral, el contenido mono nunca atraviesa un filtro y no hay
+problema de fase. Lo único que se filtra es la diferencia entre canales, y
+quitarle graves a eso es literalmente lo que se busca. Después del cambio: 0,377
+de residuo a 50 Hz contra 2,545 a 2 kHz.
+
+---
+
+## D-036 · Fase 4 · El wow & flutter se siembra explícitamente
+
+**Decisión:** `WowFlutter::prepare()` exige una semilla; cada canal recibe una
+distinta pero **fija**.
+
+**Motivo:** `juce::Random` por defecto se siembra con el reloj. Eso significa
+que el plugin sonaría distinto en cada carga del proyecto, y que ningún render
+sería reproducible.
+
+Lo detectó el test de independencia del tamaño de buffer, que empezó a fallar
+sin que nada del camino de render hubiera cambiado. Es un recordatorio útil:
+un test de reproducibilidad atrapa fuentes de no-determinismo que uno ni
+consideró.
+
+Semillas distintas por canal, no una compartida: con la misma, el bamboleo
+sería idéntico en L y R y sonaría mono.
+
+---
+
+## D-037 · Fase 4 · La cadena de efectos se saltea en silencio
+
+**Decisión:** el `SilenceGate` se consulta **antes** de la cadena de efectos, y
+si está en silencio la cadena no se procesa.
+
+**Motivo (medido):** la cadena es estéreo, así que su costo **no depende de la
+polifonía**: cuesta lo mismo con 56 voces que con ninguna. Procesarla en reposo
+costaba **1,13 % de un core por instancia** produciendo exactamente nada. En un
+proyecto con veinte instancias son 22 % de un core tirados.
+
+Saltearla es seguro porque el gate sólo se activa cuando ya no hay voces **y**
+el pico lleva ~200 ms por debajo de −120 dBFS: en ese punto las colas ya son
+inaudibles, así que congelar su estado no produce ningún salto al volver a
+sonar. La primera nota nueva levanta el gate en el mismo bloque.
+
+Resultado: **1,130 % → 0,027 %**, 42× más barato en reposo.
+
+---
+
+## D-038 · Fase 4 · Qué se puede reordenar y qué no
+
+**Decisión:** se reordenan saturación / chorus / delay (6 combinaciones). La
+reverb, el pump y la etapa de salida quedan fijos al final.
+
+**Motivo**, uno por cada bloque fijo:
+
+- La **reverb** va después del delay porque lo natural es que las repeticiones
+  del delay también entren a la sala. Al revés, el delay repetiría la reverb y
+  el resultado se vuelve barro.
+- El **pump** va después de todo el tiempo porque tiene que duckear **también
+  las colas**. Si fuera antes, la reverb seguiría sonando durante el bombo y el
+  efecto no se notaría — que es justamente lo que se quiere evitar.
+- La **salida** (ancho, graves en mono, limitador) es por definición lo último.

@@ -330,6 +330,11 @@ public:
             apvts.getParameter (pid::ampSustain)->setValueNotifyingHost (1.0f);
             apvts.getParameter (pid::ampRelease)->setValueNotifyingHost (0.0f);   // release corto
 
+            // Sin efectos: este test mide las VOCES, no las colas.
+            apvts.getParameter (pid::delayMix)->setValueNotifyingHost (0.0f);
+            apvts.getParameter (pid::reverbMix)->setValueNotifyingHost (0.0f);
+            apvts.getParameter (pid::chorusMix)->setValueNotifyingHost (0.0f);
+
             juce::AudioBuffer<float> buffer (2, 256);
 
             juce::MidiBuffer on;

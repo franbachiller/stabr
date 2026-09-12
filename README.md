@@ -13,13 +13,13 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 3 completa y verificada.** Ya suena a instrumento: 5 formas de onda,
-2 osciladores + sub, unísono de hasta 7 voces con detune y ancho estéreo,
-filtro SVF con envolvente propia, y drive asimétrico con sobremuestreo.
+**Fase 4 completa y verificada.** Ya es un instrumento de club: delay
+sincronizado al host con tres modos, reverb FDN propia, chorus BBD, saturación,
+pump sincronizado y etapa de salida con graves en mono.
 
-Build limpio sin warnings, 2.165.379 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.166.441 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
-buffer (32 a 2048).
+buffer (32 a 2048), con 93 parámetros.
 
 ### El motor de acordes
 
@@ -58,6 +58,31 @@ porque su identidad *son* sus intervalos. Detalle en [DECISIONS.md](DECISIONS.md
 - **Drive:** waveshaper asimétrico con sobremuestreo ×2 (×4 en HQ), bypass con
   retardo compensado.
 
+### La cadena de efectos
+
+Orden: **saturación → chorus → delay** (reordenables entre sí, 6 combinaciones)
+→ reverb → pump → salida. Los últimos tres son fijos por buenas razones
+([D-038](DECISIONS.md)).
+
+- **Delay** — el bloque más importante. Sincronizado al host con tresillos y
+  puntillos (`1/8.` = 3/16, el del dub techno), o en ms libres. Tres modos:
+  estéreo, ping-pong y dub (saturación + pasabanda en el lazo). HP y LP dentro
+  de la realimentación, wow & flutter, **ducking**, y freeze que sostiene
+  indefinidamente sin desbordar. Cambiar el tiempo desliza como una cinta
+  (con glissando) o salta con crossfade, a elección.
+- **Reverb** — FDN 8×8 con matriz de Hadamard y difusor Dattorro al frente.
+  Plate / room / hall, pre-delay sincronizable, damping, modulación y ducking.
+- **Chorus** — BBD de dos líneas en contrafase con el pasabajos que le da el
+  carácter Juno, más un modo ensemble de cuatro líneas.
+- **Saturación** — tape / transistor / diode con ×4 de sobremuestreo, más
+  bitcrush con reducción de sample rate (ese **sin** sobremuestrear: su
+  aliasing es el efecto).
+- **Pump** — sidechain interno alineado a la **posición del transporte**, no a
+  un LFO libre: cae siempre en el tiempo fuerte aunque arranques desde el
+  compás 37.
+- **Salida** — ancho M/S con graves en mono (requisito de club), limitador
+  suave y medidores.
+
 ### Mediciones
 
 Medido en el propio target de tests (`Tests/test_performance.cpp`), 48 kHz,
@@ -65,26 +90,32 @@ buffer 128, con 8 acordes × 7 voces = **56 voces sonando** (el peor caso):
 
 | Configuración | Osciladores | CPU de un core |
 |---|---:|---:|
-| default (unísono 1, drive off) | 112 | 11,1 % |
-| unísono 7, drive off | 322 | 14,0 % |
-| unísono 7, drive ×2 | 322 | 41,2 % |
-| unísono 7, drive ×4 (HQ) | 322 | 91,7 % |
+| default (unísono 1, drive off) | 112 | 9,5 % |
+| unísono 7, drive off | 322 | 11,6 % |
+| unísono 7, drive ×2 | 322 | 32,9 % |
+| unísono 7, drive ×4 (HQ) | 322 | 70,8 % |
 
-En reposo: 0,015 %. **HQ Mode es para render offline**, no para tocar en vivo.
+**En reposo: 0,027 %** — la cadena de efectos se saltea cuando el `SilenceGate`
+detecta silencio. Sin eso costaba 1,13 % por instancia sin producir nada
+([D-037](DECISIONS.md)). **HQ Mode es para render offline**, no para tocar.
 
 El costo del drive escala con *voces*, no con osciladores: subir el unísono de
-1 a 7 cuesta 3 puntos, encender el drive cuesta 27. La palanca es la polifonía.
+1 a 7 cuesta 2 puntos, encender el drive cuesta 21. La palanca es la polifonía.
 
 | Calidad (medida por test) | Resultado |
 |---|---|
+| Delay: posición del eco a 10 / 125 / 375 / 1000 ms | muestra **exacta** en los cuatro |
+| Delay: distorsión con retardo fraccionario | **−240 dB** (Lagrange-3) |
+| Delay: ducking de las repeticiones | 0,467 → 0,047 (**10×**) |
+| Reverb: los 3 modos con decay y size al máximo | pico 0,900, sin divergencia |
+| Reverb: rango del control de decay | 0,43 s a 5,18 s |
+| Graves en mono: residuo en contrafase a 50 Hz vs 2 kHz | 0,38 vs 2,54 |
 | Aliasing del drive con ×2 / ×4 | **−14 dB** / **−26 dB** vs sin sobremuestreo |
 | Round trip del sobremuestreador | −95,4 dB, retardo 11 muestras exactas |
-| Rechazo de imagen (1 / 5 / 10 kHz) | −94,5 / −81,8 / −82,4 dB |
 | Pendiente asintótica 12 / 24 dB/oct | 10,7 / 24,2 dB por octava |
 | Aliasing triángulo vs sierra PolyBLEP | −68,3 dB vs −62,9 dB |
-| Alineación bypass vs drive activo | −240 dB |
 | Salida con buffer 32 vs 512 | diferencia **0.000000000000** (bit a bit) |
-| Salida en reposo | exactamente `0.0f` |
+| Salida en reposo, con colas de delay y reverb | exactamente `0.0f` |
 
 Roadmap completo en [DECISIONS.md](DECISIONS.md).
 
@@ -93,7 +124,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 | 1 | Esqueleto: CMake, APVTS, sierra polifónica, tests, pluginval | **completa** |
 | 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | **completa** |
 | 3 | Carácter: osciladores, unísono, filtro SVF, drive | **completa** |
-| 4 | Efectos: delay, reverb, chorus, saturación, pump | — |
+| 4 | Efectos: delay, reverb, chorus, saturación, pump | **completa** |
 | 5 | Secuenciador: gate rítmico, swing, sync al host | — |
 | 6 | Identidad visual: GUI completa con visualizadores | — |
 | 7 | Presets, pulido, distribución | — |
@@ -195,7 +226,8 @@ Source/
   DSP/                  voces, osciladores, filtros, drive, robo por acorde
   Common/               utilidades compartidas (silencio, versionado de estado)
   Chord/                generador de acordes, escalas y ruteo de notas
-  FX/ Sequencer/ GUI/   fases 4 a 6
+  FX/                   delay, reverb, chorus, saturacion, pump, salida
+  Sequencer/ GUI/       fases 5 y 6
 Tests/                  tests headless
 Scripts/                build, validación y el .bat de instalación
 cmake/                  JUCE pinneada, flags de warnings

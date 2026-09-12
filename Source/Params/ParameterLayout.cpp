@@ -7,6 +7,7 @@
 #include "../DSP/Voice.h"
 #include "../DSP/Oscillators/Oscillator.h"
 #include "../DSP/Filters/SvfTpt.h"
+#include "../FX/FxChain.h"
 
 namespace stabr
 {
@@ -317,6 +318,247 @@ APVTS::ParameterLayout createParameterLayout()
 
     layout.add (std::make_unique<juce::AudioParameterBool> (
         makeID (pid::chordOctaveDouble), "Octave Down", false));
+
+    //==========================================================================
+    // CADENA DE EFECTOS
+    //==========================================================================
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::fxOrder), "FX Order",
+        toStringArray (fx::fxOrderNames), (int) fx::FxOrder::satChorusDelay));
+
+    // --- Saturacion -----------------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::satEnabled), "Sat On", true));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::satType), "Sat Type",
+        toStringArray (fx::saturationTypeNames), (int) fx::SaturationType::tape));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::satDrive), "Sat Drive",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::satBits), "Bit Depth",
+        juce::NormalisableRange<float> { 2.0f, 16.0f, 1.0f }, 12.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (
+            [] (float v, int) { return juce::String (juce::roundToInt (v)) + " bits"; })));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::satRateReduce), "Rate Reduce",
+        juce::NormalisableRange<float> { 1.0f, 50.0f, 1.0f }, 1.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (
+            [] (float v, int) { const auto n = juce::roundToInt (v);
+                                return n <= 1 ? juce::String ("Off")
+                                              : juce::String ("1/") + juce::String (n); })));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::satMix), "Sat Mix",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 1.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    // --- Chorus ---------------------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::chorusEnabled), "Chorus On", true));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::chorusEnsemble), "Ensemble", false));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::chorusRate), "Chorus Rate",
+        timeRange (0.02f, 10.0f, 0.8f), 0.6f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (
+            [] (float v, int) { return juce::String (v, 2) + " Hz"; })));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::chorusDepth), "Chorus Depth",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::chorusWidth), "Chorus Width",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.8f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::chorusMix), "Chorus Mix",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    // --- Delay: el bloque mas importante del plugin ---------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::delayEnabled), "Delay On", true));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::delayMode), "Delay Mode",
+        toStringArray (fx::delayModeNames), (int) fx::DelayMode::stereo));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::delaySync), "Delay Sync", true));
+
+    // 1/8. = 3/16: el tiempo de delay del dub techno.
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::delayDivision), "Delay Time",
+        toStringArray (fx::divisionNames), (int) fx::Division::n1_8D));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayFreeMs), "Delay Time (ms)",
+        timeRange (10.0f, 4000.0f, 400.0f), 375.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (msText)
+                                             .withLabel ("ms")));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayOffset), "Delay Offset",
+        juce::NormalisableRange<float> { -1.0f, 1.0f }, 0.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (bipolarText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayFeedback), "Feedback",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.45f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::delayFreeze), "Freeze", false));
+
+    /*  Los filtros del lazo son lo que hace que el delay se pueda usar en una
+        mezcla: sin ellos, cada repeticion mantiene todo su contenido y a las
+        cuatro repeticiones hay barro. */
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayHighpass), "Delay HP",
+        timeRange (20.0f, 2000.0f, 200.0f), 180.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (hzText)
+                                             .withLabel ("Hz")));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayLowpass), "Delay LP",
+        timeRange (400.0f, 20000.0f, 4000.0f), 6000.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (hzText)
+                                             .withLabel ("Hz")));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayModDepth), "Wow & Flutter",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.15f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::delayGlide), "Time Change",
+        juce::StringArray { "Tape", "Digital" },
+        (int) fx::DelayLine::GlideMode::tape));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayDucking), "Delay Duck",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.4f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::delayMix), "Delay Mix",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.3f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    // --- Reverb ---------------------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::reverbEnabled), "Reverb On", true));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::reverbMode), "Reverb Mode",
+        toStringArray (fx::reverbModeNames), (int) fx::ReverbMode::plate));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbSize), "Reverb Size",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbDecay), "Reverb Decay",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbDamping), "Reverb Damping",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbModDepth), "Reverb Mod",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.3f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::reverbPreDelaySync), "Pre-Delay Sync", false));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::reverbPreDelayDiv), "Pre-Delay Div",
+        toStringArray (fx::divisionNames), (int) fx::Division::n1_16));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbPreDelayMs), "Pre-Delay",
+        timeRange (0.0f, 500.0f, 40.0f), 20.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (msText)
+                                             .withLabel ("ms")));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbLowCut), "Reverb Low Cut",
+        timeRange (20.0f, 1000.0f, 200.0f), 150.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (hzText)
+                                             .withLabel ("Hz")));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbDucking), "Reverb Duck",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.35f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::reverbMix), "Reverb Mix",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.2f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    // --- Pump -----------------------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::pumpEnabled), "Pump On", false));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::pumpDivision), "Pump Rate",
+        toStringArray (fx::divisionNames), (int) fx::Division::n1_4));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::pumpDepth), "Pump Depth",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::pumpShape), "Pump Shape",
+        juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::pumpAttack), "Pump Attack",
+        timeRange (1.0f, 100.0f, 15.0f), 8.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (msText)
+                                             .withLabel ("ms")));
+
+    // --- Salida ---------------------------------------------------------------
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::outputWidth), "Width",
+        juce::NormalisableRange<float> { 0.0f, 2.0f }, 1.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (
+            [] (float v, int) { return juce::String (juce::roundToInt (v * 100.0f)) + " %"; })));
+
+    /*  Graves en mono: requisito de club, no un extra. Ver StereoOutput.h. */
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::outputMonoBelow), "Mono Below",
+        timeRange (20.0f, 500.0f, 120.0f), 120.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (hzText)
+                                             .withLabel ("Hz")));
+
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::outputLimiter), "Limiter", true));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::outputGain), "Output",
+        juce::NormalisableRange<float> { -24.0f, 12.0f, 0.1f }, 0.0f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (dbText)
+                                             .withLabel ("dB")));
 
     // --- Global ---------------------------------------------------------------
     layout.add (std::make_unique<juce::AudioParameterFloat> (

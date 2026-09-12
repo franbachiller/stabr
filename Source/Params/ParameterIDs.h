@@ -62,6 +62,62 @@ namespace stabr::pid
     // --- Drive ----------------------------------------------------------------
     inline constexpr auto driveAmount = "drive_amount";
 
+    // --- Cadena de efectos (Fase 4) -------------------------------------------
+    inline constexpr auto fxOrder = "fx_order";
+
+    inline constexpr auto satEnabled     = "sat_enabled";
+    inline constexpr auto satType        = "sat_type";
+    inline constexpr auto satDrive       = "sat_drive";
+    inline constexpr auto satBits        = "sat_bits";
+    inline constexpr auto satRateReduce  = "sat_rate_reduce";
+    inline constexpr auto satMix         = "sat_mix";
+
+    inline constexpr auto chorusEnabled  = "chorus_enabled";
+    inline constexpr auto chorusEnsemble = "chorus_ensemble";
+    inline constexpr auto chorusRate     = "chorus_rate";
+    inline constexpr auto chorusDepth    = "chorus_depth";
+    inline constexpr auto chorusWidth    = "chorus_width";
+    inline constexpr auto chorusMix      = "chorus_mix";
+
+    inline constexpr auto delayEnabled   = "delay_enabled";
+    inline constexpr auto delayMode      = "delay_mode";
+    inline constexpr auto delaySync      = "delay_sync";
+    inline constexpr auto delayDivision  = "delay_division";
+    inline constexpr auto delayFreeMs    = "delay_free_ms";
+    inline constexpr auto delayOffset    = "delay_offset";
+    inline constexpr auto delayFeedback  = "delay_feedback";
+    inline constexpr auto delayFreeze    = "delay_freeze";
+    inline constexpr auto delayHighpass  = "delay_hp";
+    inline constexpr auto delayLowpass   = "delay_lp";
+    inline constexpr auto delayModDepth  = "delay_mod";
+    inline constexpr auto delayGlide     = "delay_glide";
+    inline constexpr auto delayDucking   = "delay_duck";
+    inline constexpr auto delayMix       = "delay_mix";
+
+    inline constexpr auto reverbEnabled      = "rev_enabled";
+    inline constexpr auto reverbMode         = "rev_mode";
+    inline constexpr auto reverbSize         = "rev_size";
+    inline constexpr auto reverbDecay        = "rev_decay";
+    inline constexpr auto reverbDamping      = "rev_damping";
+    inline constexpr auto reverbModDepth     = "rev_mod";
+    inline constexpr auto reverbPreDelaySync = "rev_predelay_sync";
+    inline constexpr auto reverbPreDelayDiv  = "rev_predelay_div";
+    inline constexpr auto reverbPreDelayMs   = "rev_predelay_ms";
+    inline constexpr auto reverbLowCut       = "rev_lowcut";
+    inline constexpr auto reverbDucking      = "rev_duck";
+    inline constexpr auto reverbMix          = "rev_mix";
+
+    inline constexpr auto pumpEnabled  = "pump_enabled";
+    inline constexpr auto pumpDivision = "pump_division";
+    inline constexpr auto pumpDepth    = "pump_depth";
+    inline constexpr auto pumpShape    = "pump_shape";
+    inline constexpr auto pumpAttack   = "pump_attack";
+
+    inline constexpr auto outputWidth     = "out_width";
+    inline constexpr auto outputMonoBelow = "out_mono_below";
+    inline constexpr auto outputLimiter   = "out_limiter";
+    inline constexpr auto outputGain      = "out_gain";
+
     // --- Motor de acordes (Fase 2) -------------------------------------------
     inline constexpr auto chordType         = "chord_type";
     inline constexpr auto chordVoicing      = "chord_voicing";
