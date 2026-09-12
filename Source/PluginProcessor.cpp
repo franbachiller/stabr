@@ -11,29 +11,7 @@ StabrProcessor::StabrProcessor()
                                 .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, state::rootType, createParameterLayout())
 {
-    auto get = [this] (const char* id) { return apvts.getRawParameterValue (id); };
-
-    pAmpAttack         = get (pid::ampAttack);
-    pAmpDecay          = get (pid::ampDecay);
-    pAmpSustain        = get (pid::ampSustain);
-    pAmpRelease        = get (pid::ampRelease);
-    pOsc1Level         = get (pid::osc1Level);
-    pMasterGain        = get (pid::masterGain);
-    pPolyphony         = get (pid::polyphony);
-    pPitchBendRange    = get (pid::pitchBendRange);
-
-    pChordType         = get (pid::chordType);
-    pChordVoicing      = get (pid::chordVoicing);
-    pChordInversion    = get (pid::chordInversion);
-    pChordSpread       = get (pid::chordSpread);
-    pChordDensity      = get (pid::chordDensity);
-    pChordOctaveDouble = get (pid::chordOctaveDouble);
-    pScaleLock         = get (pid::scaleLock);
-    pScaleKey          = get (pid::scaleKey);
-    pScaleMode         = get (pid::scaleMode);
-    pNoteMode          = get (pid::noteMode);
-
-    jassert (pAmpAttack != nullptr && pChordType != nullptr && pNoteMode != nullptr);
+    p.resolve (apvts);
 
     startTimer (100);
 }
@@ -52,7 +30,7 @@ void StabrProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     masterGainSmoothed.reset (sampleRate, 0.02);
     masterGainSmoothed.setCurrentAndTargetValue (
-        juce::Decibels::decibelsToGain (pMasterGain->load(), -60.0f));
+        juce::Decibels::decibelsToGain (p.masterGain->load(), -60.0f));
 
     currentBendNormalised = 0.0f;
 }
@@ -100,29 +78,18 @@ void StabrProcessor::timerCallback()
 //==============================================================================
 void StabrProcessor::updateParametersForBlock() noexcept
 {
-    voices.setMaxPolyphony ((int) pPolyphony->load());
-    voices.setEnvelopeParameters (pAmpAttack->load(),
-                                  pAmpDecay->load(),
-                                  pAmpSustain->load(),
-                                  pAmpRelease->load());
-    voices.setLevel (pOsc1Level->load());
-    voices.setPitchBendSemitones (currentBendNormalised * pPitchBendRange->load());
+    voices.setMaxPolyphony ((int) p.polyphony->load());
 
-    chordParams.type            = (chord::ChordType)   (int) pChordType->load();
-    chordParams.lock            = (chord::ScaleLock)   (int) pScaleLock->load();
-    chordParams.keyRoot         =                      (int) pScaleKey->load();
-    chordParams.mode            = (chord::ScaleMode)   (int) pScaleMode->load();
-    chordParams.voicing         = (chord::VoicingType) (int) pChordVoicing->load();
-    chordParams.inversion       =                      (int) pChordInversion->load();
-    chordParams.spread          =                      (int) pChordSpread->load();
-    chordParams.density         =                      (int) pChordDensity->load();
-    chordParams.doubleRootBelow = pChordOctaveDouble->load() > 0.5f;
+    p.fillVoiceParams (voiceParams, currentBendNormalised * p.pitchBendRange->load());
+    voices.setParams (voiceParams);
 
-    router.setNoteMode ((chord::NoteMode) (int) pNoteMode->load());
+    p.fillChordParams (chordParams);
+
+    router.setNoteMode ((chord::NoteMode) (int) p.noteMode->load());
     desiredLatency.store (router.getLatencySamples());
 
     masterGainSmoothed.setTargetValue (
-        juce::Decibels::decibelsToGain (pMasterGain->load(), -60.0f));
+        juce::Decibels::decibelsToGain (p.masterGain->load(), -60.0f));
 }
 
 //==============================================================================
@@ -158,7 +125,8 @@ void StabrProcessor::applyEvent (const NoteRouter::Event& e) noexcept
 
         case Type::pitchBend:
             currentBendNormalised = ((float) e.pitchWheel - 8192.0f) / 8192.0f;
-            voices.setPitchBendSemitones (currentBendNormalised * pPitchBendRange->load());
+            voiceParams.pitchBendSemitones = currentBendNormalised * p.pitchBendRange->load();
+            voices.setParams (voiceParams);
             break;
     }
 }

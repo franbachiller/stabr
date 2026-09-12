@@ -334,8 +334,8 @@ Confirmadas con el usuario, se implementan en la fase que corresponde:
 |---|---|---|
 | ~~D-011~~ | ~~2~~ | **Implementada.** Terminó con *tres* modos, no dos: `Off` (sin tonalidad, acorde literal sobre la nota tocada), `Diatonic` (default) y `Literal`. Faltaba `Off`: no todo el mundo quiere cuantizar. Detalle en D-021. |
 | ~~D-012~~ | ~~2~~ | **Implementada.** `Chord` (default) / `Passthrough` / `Auto`, con ventana de 20 ms y latencia declarada al host vía `NoteRouter::getLatencySamples()`. `setLatencySamples()` no se puede llamar desde el hilo de audio, así que el procesador publica el valor en un atómico y un `Timer` lo aplica en el hilo de mensajes. |
-| D-013 | 3 | **Drive por voz con oversampling ×2 (polyphase IIR)**, no ×4 FIR. La saturación global sí va ×4 FIR. Switch `HQ Mode` sube el drive por voz a ×4 para render offline. Motivo: ×4 por voz con 8 voces × 7 unísonos es CPU que no rinde; la fase no lineal del IIR es irrelevante porque cada voz se filtra y satura por separado. **A revisar con mediciones reales en Fase 3.** |
-| D-014 | 3 | **Presupuesto duro de osciladores** (arranca en 128). Cuando un acorde lo excede se baja el unísono por voz (7→5→3) en vez de tirar notas: perder densidad de detune es imperceptible, perder la novena del acorde es catastrófico. |
+| ~~D-013~~ | ~~3~~ | **Implementada y validada con datos**, con una corrección: el filtro terminó siendo **FIR halfband generado**, no IIR polifásico (ver D-031). ×2 por voz + ×4 en HQ. La medición confirma la decisión: ×2 mejora **14 dB** de aliasing y ×4 llega a **26 dB** en agudos con drive a tope. Costo real del peor caso: 14,0 % sin drive, 41,2 % con ×2, **91,7 % con ×4**. HQ es para render offline, no para tocar en vivo, y así está documentado. |
+| ~~D-014~~ | ~~3~~ | **Implementada, con dos correcciones que aparecieron al medir.** (1) El presupuesto es un techo **blando**, no duro: nunca se dejan acordes incompletos, así que el mínimo de 1 unísono por voz puede pasarlo (256 de presupuesto, 322 osciladores medidos en el peor caso). (2) **No controla el costo del drive**, que escala con VOCES y no con osciladores: subir el unísono de 1 a 7 sube de 11,1 % a 14,0 %, mientras que encender el drive salta a 41,2 %. La palanca para el drive es la polifonía, no el unísono. El presupuesto arranca en 256, no en 128: con 128 se quedaba corto para un acorde de 7 notas con unísono 7. |
 | D-015 | 4 | **Línea de delay propia**, no `juce::dsp::DelayLine`: hace falta un punto de inserción dentro del lazo de feedback (HP/LP/saturación/band-pass del modo dub) y un puntero de lectura con slew propio para el pitch drift de cinta. Interpolación **Lagrange 3er orden** (lineal modula el brillo con el wow&flutter; allpass hace ruido con el puntero en movimiento). Dos comportamientos al cambiar el tiempo: `Tape` (slew, con drift) por defecto y `Digital` (crossfade). |
 | D-016 | 4 | **Reverb FDN 8×8 con matriz Hadamard** + difusor de entrada tipo Dattorro, en vez de Dattorro puro. Un solo motor cubre plate/room/hall escalando largos de línea y ganancias desde RT60. Riesgo conocido: un FDN mal parametrizado hace flutter metálico — mitigación con largos primos entre sí, modulación independiente por línea y damping por realimentación. Plan B si no suena: Dattorro para plate + FDN para room/hall. |
 | D-017 | 5 | **El secuenciador latchea:** apretás una tecla, la soltás, y sigue disparando ese acorde. Si no hay nada apretado, cae a la fundamental de la tonalidad. Sin esto no se cumple la promesa de sacar un stab en 30 segundos. |
@@ -392,3 +392,151 @@ Un test de regresión que nunca se vio fallar no prueba nada.
 la Fase 2 — el usuario lo notó y preguntó si el plugin se había actualizado.
 Un texto que hay que acordarse de cambiar a mano siempre termina mintiendo, y
 en este caso mentía sobre algo que importa: qué versión está cargada.
+
+---
+
+## D-026 · Fase 3 · Los coeficientes del filtro se separan del estado
+
+**Decisión:** `SvfCoeffs` es una estructura aparte de `SvfTpt`. El filtro solo
+guarda las dos variables de estado; los coeficientes llegan de afuera.
+
+**Motivo (medido):** los dos canales de una voz tienen el mismo cutoff y la
+misma resonancia, y el filtro de 24 dB tiene dos etapas. Con cada filtro
+calculando lo suyo, la voz hacía **cuatro divisiones por muestra para obtener
+cuatro veces el mismo resultado**. Calculándolos una vez y compartiéndolos, son
+dos — y como `a1`, `a2` y `a3` son funciones suaves de `g`, se **interpolan**
+linealmente entre puntos de control en vez de recalcularse, así que la división
+desaparece del camino por muestra.
+
+Junto con saltear los osciladores en nivel cero y el bypass del drive (D-027),
+esto bajó el costo de 32 voces de **20,3 % a 5,9 %** de un core.
+
+---
+
+## D-027 · Fase 3 · El drive apagado se saltea, con el retardo compensado
+
+**Decisión:** con `drive = 0` la señal pasa por una línea de retardo puro de
+**11 muestras** en vez de por el sobremuestreador.
+
+**Motivo:** el sobremuestreo ×2 es el bloque más caro del sintetizador y con el
+drive en cero no hace absolutamente nada. Pero apagarlo a secas adelantaría la
+voz 11 muestras, y **eso sí hace un salto audible** si pasa en medio de una
+nota.
+
+Las 11 muestras no son una estimación: es el retardo de grupo **medido** con un
+round trip del sobremuestreador, y hay un test que verifica que los dos caminos
+siguen alineados (difieren en −240 dB). Si alguien cambia el kernel del
+halfband y el retardo deja de coincidir, el test falla.
+
+---
+
+## D-028 · Fase 3 · Dos bugs del drive que encontraron los tests
+
+Los dos son ejemplos de por qué el test se escribe **además** del código, no
+después de darlo por bueno.
+
+### El drive amplificaba en vez de recortar
+
+Con `kMaxBias = 0.6`, la entrada en +0,5 daba +1,0 y en **−0,5 daba −3,37**.
+Eso no es "asimetría que agrega armónicos pares": es romper la forma de onda y
+meterle un offset enorme al filtro que viene después.
+
+Dos causas sumadas: el bias era demasiado grande, y la compensación normalizaba
+**sólo por el extremo positivo**, dejando el negativo fuera de rango. Ahora
+`kMaxBias = 0.25` y se normaliza por el mayor de los dos extremos.
+
+### El drive en cero no era transparente
+
+La compensación hacía que la entrada 1 diera salida 1. Pero la curva ya comprime
+por su cuenta, así que para lograrlo aplicaba **+2,2 dB con el drive en CERO**, y
+mover el control apenas un poco daba un salto de nivel.
+
+Ahora sólo se atenúa, nunca se amplifica: `outputGain = extreme > 1 ? 1/extreme : 1`.
+Con drive 0 eso es exactamente la identidad.
+
+---
+
+## D-029 · Fase 3 · Auto-oscilación real, acotada por saturación
+
+**Decisión:** `kMinDamping = 0.0` (k = 1/Q llega a cero), y lo que acota la
+oscilación es un saturador suave en el estado del pasabanda, no el
+amortiguamiento.
+
+**Motivo:** con `kMinDamping = 0.02` (Q = 50) el filtro sonaba muy resonante
+pero la oscilación **se apagaba en ~8 ms**. El test que mide si se sostiene
+daba pico 0,000 tras 4 segundos: eso es resonancia, no auto-oscilación, y el
+brief pide auto-oscilación.
+
+Con k = 0 el SVF queda marginalmente estable y sostiene el tono. Es exactamente
+lo que hace un filtro analógico: lo que le pone techo a la oscilación es la
+saturación del circuito, no el amortiguamiento. El test ahora verifica **las dos
+cosas**: que se sostenga (pico > 0,01) y que quede acotada (pico < 10).
+
+---
+
+## D-030 · Fase 3 · El triángulo va sin corrección, y hay una medición que lo respalda
+
+**Decisión:** `processTriangle()` es ingenuo, sin polyBLEP ni polyBLAMP.
+
+**Motivo:** a diferencia de la sierra y el pulso, el triángulo no tiene saltos
+de valor, sólo de pendiente. Sus armónicos caen como 1/n² en vez de 1/n, así que
+su aliasing arranca mucho más abajo. Corregirlo requeriría polyBLAMP, que es
+otra familia de residuos y más cara.
+
+**Medido a 3729 Hz:** triángulo ingenuo **−68,3 dB**, sierra con PolyBLEP
+−62,9 dB. El triángulo aliasa *menos* que la sierra ya corregida.
+
+Hay un test que compara los dos. Si algún día el triángulo queda por encima, el
+test falla y ahí sí se justifica polyBLAMP. La decisión no es "es suficiente":
+es "lo medimos y la evidencia se revisa sola".
+
+---
+
+## D-031 · Fase 3 · Halfband FIR generado, no coeficientes IIR de memoria
+
+**Decisión:** el sobremuestreador usa un FIR halfband de 23 taps cuyos
+coeficientes se **generan** por sinc enventanado con Blackman.
+
+**Alternativa descartada:** un IIR polifásico, que es más barato por muestra.
+
+**Motivo:** los coeficientes de un IIR polifásico son números mágicos de una
+tabla. Los de un FIR halfband se derivan de una fórmula, o sea que son
+**verificables**: hay tests que miden la ganancia en continua, la simetría, el
+retardo de grupo y el rechazo de imagen reales (−94 dB a 1 kHz, −82 dB a 10 kHz).
+DSP delicado se escribe y después se mide.
+
+La estructura halfband (la mitad de los coeficientes son cero) reduce cada
+dirección a un FIR corto en una rama y un retardo puro en la otra. Además, los
+coeficientes de los extremos quedan en ~1e-18 por la ventana y se **descartan
+escaneando la tabla**, no hardcodeando índices: 12 taps pasan a 10, un 17 %
+menos de trabajo en el bloque más caro del sintetizador.
+
+> Detalle que costó tiempo: el primer intento los descartaba comparando
+> `== 0.0f` y no descartaba ninguno, porque son diminutos pero no exactamente
+> cero. El log del test lo delató (`coeficientes utiles: 0..11 de 12`).
+
+---
+
+## D-032 · Fase 3 · Cómo medir aliasing sin engañarse
+
+Tres intentos fallidos antes de tener una medición válida. Queda escrito porque
+los tres errores son fáciles de repetir:
+
+1. **Comparar peras con manzanas.** La primera versión medía el aliasing de una
+   sierra ingenua pasada por el shaper, contra el del camino con sobremuestreo
+   — pero con ganancias distintas. La sierra ya aliasa por sí sola y tapaba
+   todo. Ahora se compara **la misma curva con la misma ganancia sobre una
+   senoidal pura**, y la curva es una función libre justamente para que el test
+   pueda llamarla sin reimplementarla.
+
+2. **Frecuencias conmensurables.** Con f = 1500 Hz a 48 kHz, los componentes
+   aliaseados caen **justo encima de armónicos reales** y son indistinguibles:
+   la medición daba −270 dB y parecía que no había aliasing. Hay que usar
+   frecuencias inconmensurables (1414,21 · 2718,28 · 5432,11).
+
+3. **DFT sin ventana.** La fuga espectral de los armónicos fuertes dejaba un
+   piso de ~−50 dB que tapaba el aliasing. Con ventana de Blackman el piso baja
+   a −100 dB y el efecto real aparece.
+
+Recién con las tres cosas bien la medición mostró lo que dice D-013: ×2 mejora
+**14 dB** y ×4 mejora **26 dB** en agudos con drive a tope.

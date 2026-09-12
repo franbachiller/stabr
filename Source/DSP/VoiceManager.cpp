@@ -33,22 +33,23 @@ void VoiceManager::setMaxPolyphony (int n) noexcept
     maxPolyphony = juce::jlimit (1, kMaxPolyphony, n);
 }
 
-void VoiceManager::setEnvelopeParameters (float a, float d, float s, float r) noexcept
+void VoiceManager::setParams (const VoiceParams& p) noexcept
 {
+    params = p;
+
     for (auto& v : voices)
-        v.setEnvelopeParameters (a, d, s, r);
+        if (v.isActive())
+            v.setParams (p);
 }
 
-void VoiceManager::setLevel (float linearGain) noexcept
+int VoiceManager::getOscillatorCount() const noexcept
 {
-    for (auto& v : voices)
-        v.setLevel (linearGain);
-}
+    int n = 0;
 
-void VoiceManager::setPitchBendSemitones (float semis) noexcept
-{
-    for (auto& v : voices)
-        v.setPitchBendSemitones (semis);
+    for (const auto& v : voices)
+        n += v.getOscillatorCount();
+
+    return n;
 }
 
 //==============================================================================
@@ -203,6 +204,25 @@ void VoiceManager::noteOnChord (int triggerNote, const chord::ChordResult& notes
     slot->stamp       = stamp;
     slot->sounding    = true;
 
+    /*  PRESUPUESTO DE OSCILADORES (DECISIONS.md D-014).
+
+        8 acordes x 7 notas x 7 unisonos x 2 osciladores son casi 800
+        osciladores: el peor caso teorico no entra en ninguna CPU. Cuando el
+        acorde nuevo no cabe se le BAJA EL UNISONO, no se le tiran notas.
+        Perder densidad de detune es casi imperceptible; perder la novena del
+        acorde cambia la armonia. */
+    const int subPerVoice = params.subLevel > 0.0001f ? 1 : 0;
+    const int inUse = getOscillatorCount();
+    int unisonToUse = juce::jlimit (1, Voice::kMaxUnison, params.unisonCount);
+
+    while (unisonToUse > 1
+           && inUse + notes.count * (unisonToUse * 2 + subPerVoice) > kOscillatorBudget)
+    {
+        --unisonToUse;
+    }
+
+    lastUnisonUsed = unisonToUse;
+
     for (int i = 0; i < notes.count; ++i)
     {
         auto* v = findFreeVoice();
@@ -242,7 +262,7 @@ void VoiceManager::noteOnChord (int triggerNote, const chord::ChordResult& notes
                 break;
         }
 
-        v->noteOn (notes[i], velocity, chordId, stamp);
+        v->noteOn (notes[i], velocity, chordId, stamp, params, unisonToUse);
     }
 }
 

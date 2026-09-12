@@ -25,8 +25,42 @@ namespace stabr::pid
     inline constexpr auto ampSustain  = "amp_sustain";
     inline constexpr auto ampRelease  = "amp_release";
 
-    // --- Oscilador (Fase 1: solo sierra; se expande en Fase 3) ---------------
+    // --- Osciladores ----------------------------------------------------------
     inline constexpr auto osc1Level   = "osc1_level";
+    inline constexpr auto osc1Wave    = "osc1_wave";
+    inline constexpr auto osc2Wave    = "osc2_wave";
+    inline constexpr auto osc2Level   = "osc2_level";
+    inline constexpr auto osc2Detune  = "osc2_detune";
+    inline constexpr auto osc2Octave  = "osc2_octave";
+    inline constexpr auto subWave     = "sub_wave";
+    inline constexpr auto subLevel    = "sub_level";
+    inline constexpr auto subOctave   = "sub_octave";
+    inline constexpr auto pulseWidth  = "osc_pulse_width";
+
+    // --- Unisono --------------------------------------------------------------
+    inline constexpr auto unisonCount       = "uni_count";
+    inline constexpr auto unisonDetune      = "uni_detune";
+    inline constexpr auto unisonWidth       = "uni_width";
+    inline constexpr auto unisonRandomPhase = "uni_phase_random";
+
+    // --- Filtro ---------------------------------------------------------------
+    inline constexpr auto filterCutoff    = "filt_cutoff";
+    inline constexpr auto filterResonance = "filt_reso";
+    inline constexpr auto filterType      = "filt_type";
+    inline constexpr auto filterSlope     = "filt_slope";
+    inline constexpr auto filterEnvAmount = "filt_env_amount";
+    inline constexpr auto filterKeyTrack  = "filt_key_track";
+    inline constexpr auto filterVelAmount = "filt_vel_amount";
+    inline constexpr auto filterPeakComp  = "filt_peak_comp";
+
+    // --- Envolvente de filtro -------------------------------------------------
+    inline constexpr auto filtEnvAttack  = "fenv_attack";
+    inline constexpr auto filtEnvDecay   = "fenv_decay";
+    inline constexpr auto filtEnvSustain = "fenv_sustain";
+    inline constexpr auto filtEnvRelease = "fenv_release";
+
+    // --- Drive ----------------------------------------------------------------
+    inline constexpr auto driveAmount = "drive_amount";
 
     // --- Motor de acordes (Fase 2) -------------------------------------------
     inline constexpr auto chordType         = "chord_type";

@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "Voice.h"
+#include "VoiceParams.h"
 #include "../Chord/ChordTypes.h"
 
 namespace stabr
@@ -37,9 +38,20 @@ public:
     void reset() noexcept;
 
     void setMaxPolyphony (int n) noexcept;
-    void setEnvelopeParameters (float attackMs, float decayMs, float sustain, float releaseMs) noexcept;
-    void setLevel (float linearGain) noexcept;
-    void setPitchBendSemitones (float semis) noexcept;
+
+    /*  Los parametros de voz se arman una vez por bloque en el procesador y se
+        reparten a todas las voces de una. */
+    void setParams (const VoiceParams& params) noexcept;
+
+    /*  Presupuesto global de osciladores. Ver DECISIONS.md D-014.
+
+        Cuando un acorde nuevo no entra, se le BAJA EL UNISONO en vez de
+        tirarle notas: perder densidad de detune es casi imperceptible, perder
+        la novena del acorde es catastrofico. */
+    static constexpr int kOscillatorBudget = 256;
+
+    int getOscillatorCount() const noexcept;
+    int getLastUnisonUsed() const noexcept { return lastUnisonUsed; }
 
     /*  Dispara un acorde completo. triggerNote es la tecla que lo genero: es
         la que hay que pasarle despues a noteOff. */
@@ -84,9 +96,12 @@ private:
     std::array<ChordSlot, (size_t) kMaxChords * 2> slots;   // holgura para soltados
     juce::AudioBuffer<float> scratch;   // canal derecho cuando la salida es mono
 
+    VoiceParams params;
+
     double sampleRate   = 44100.0;
     int maxPolyphony    = 6;
     std::uint64_t stampCounter = 0;
     int nextChordId     = 0;
+    int lastUnisonUsed  = 1;
 };
 }

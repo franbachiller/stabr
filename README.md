@@ -13,11 +13,11 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 2 completa y verificada.** Una tecla dispara un acorde. Escalas con
-scale lock diatónico, 13 tipos de acorde, voicings, inversiones, densidad,
-spread, y tres modos de nota (Chord / Passthrough / Auto).
+**Fase 3 completa y verificada.** Ya suena a instrumento: 5 formas de onda,
+2 osciladores + sub, unísono de hasta 7 voces con detune y ancho estéreo,
+filtro SVF con envolvente propia, y drive asimétrico con sobremuestreo.
 
-Build limpio sin warnings, 2.154.986 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.165.379 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
 buffer (32 a 2048).
 
@@ -44,28 +44,46 @@ forma de tocar una nota fuera de tonalidad**. Verificado por test sobre
 `power` y `dim7` son excepciones deliberadas: mantienen sus intervalos exactos
 porque su identidad *son* sus intervalos. Detalle en [DECISIONS.md](DECISIONS.md) D-021.
 
+### El carácter
+
+- **Osciladores:** sierra y pulso con PWM por PolyBLEP; triángulo ingenuo
+  (justificado: aliasa *menos* que la sierra corregida, ver D-030); órgano
+  tipo M1 por wavetable band-limited con mipmap de 8 tablas.
+- **Unísono:** 1 a 7 copias por voz, detune simétrico, paneo de potencia
+  constante y fase inicial fija o aleatoria.
+- **Filtro:** SVF topology-preserving (Zavalishin), 12 y 24 dB/oct, LP/BP/HP,
+  con auto-oscilación real acotada por saturación. Cutoff modulado por
+  envolvente propia (bipolar), key tracking y velocity — todo sumado en
+  **octavas**, no en Hz.
+- **Drive:** waveshaper asimétrico con sobremuestreo ×2 (×4 en HQ), bypass con
+  retardo compensado.
+
 ### Mediciones
 
 Medido en el propio target de tests (`Tests/test_performance.cpp`), 48 kHz,
-buffer 128:
+buffer 128, con 8 acordes × 7 voces = **56 voces sonando** (el peor caso):
 
-| Acordes | Voces | Factor tiempo real | CPU de un core |
-|---:|---:|---:|---:|
-| 1 | 4 | 560× | 0,18 % |
-| 4 | 16 | 228× | 0,44 % |
-| 8 | 32 | 131× | 0,76 % |
-| 8 (densidad 7) | 56 | — | **1,27 %** |
+| Configuración | Osciladores | CPU de un core |
+|---|---:|---:|
+| default (unísono 1, drive off) | 112 | 11,1 % |
+| unísono 7, drive off | 322 | 14,0 % |
+| unísono 7, drive ×2 | 322 | 41,2 % |
+| unísono 7, drive ×4 (HQ) | 322 | 91,7 % |
 
-Peor caso absoluto: 8 acordes × 7 voces = 56 voces sonando, 1,27 % de un core.
-A 96 kHz sube a 1,52 %, a 192 kHz a 3,06 %. En reposo cae a 0,12 % gracias al
-`SilenceGate`.
+En reposo: 0,015 %. **HQ Mode es para render offline**, no para tocar en vivo.
 
-| Calidad | Resultado |
+El costo del drive escala con *voces*, no con osciladores: subir el unísono de
+1 a 7 cuesta 3 puntos, encender el drive cuesta 27. La palanca es la polifonía.
+
+| Calidad (medida por test) | Resultado |
 |---|---|
-| Aliasing PolyBLEP vs sierra ingenua (C8, 48 kHz) | **−72,6 dB** vs −57,3 dB |
+| Aliasing del drive con ×2 / ×4 | **−14 dB** / **−26 dB** vs sin sobremuestreo |
+| Round trip del sobremuestreador | −95,4 dB, retardo 11 muestras exactas |
+| Rechazo de imagen (1 / 5 / 10 kHz) | −94,5 / −81,8 / −82,4 dB |
+| Pendiente asintótica 12 / 24 dB/oct | 10,7 / 24,2 dB por octava |
+| Aliasing triángulo vs sierra PolyBLEP | −68,3 dB vs −62,9 dB |
+| Alineación bypass vs drive activo | −240 dB |
 | Salida con buffer 32 vs 512 | diferencia **0.000000000000** (bit a bit) |
-| Duración del stab a 44,1 / 48 / 96 / 192 kHz | 168,30 / 168,31 / 168,30 / 168,30 ms |
-| Salto máximo de muestra al robar voces | 0,52 (umbral 1,2) |
 | Salida en reposo | exactamente `0.0f` |
 
 Roadmap completo en [DECISIONS.md](DECISIONS.md).
@@ -74,7 +92,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 |---|---|---|
 | 1 | Esqueleto: CMake, APVTS, sierra polifónica, tests, pluginval | **completa** |
 | 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | **completa** |
-| 3 | Carácter: osciladores, unísono, filtro SVF, drive | — |
+| 3 | Carácter: osciladores, unísono, filtro SVF, drive | **completa** |
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | — |
 | 5 | Secuenciador: gate rítmico, swing, sync al host | — |
 | 6 | Identidad visual: GUI completa con visualizadores | — |
@@ -174,7 +192,7 @@ Source/
   PluginProcessor.*     procesador principal, dispatch de MIDI por sub-bloque
   PluginEditor.*        GUI placeholder (se tira entera en Fase 6)
   Params/               IDs estables y layout de parámetros
-  DSP/                  voces, osciladores, envolventes, robo por acorde
+  DSP/                  voces, osciladores, filtros, drive, robo por acorde
   Common/               utilidades compartidas (silencio, versionado de estado)
   Chord/                generador de acordes, escalas y ruteo de notas
   FX/ Sequencer/ GUI/   fases 4 a 6

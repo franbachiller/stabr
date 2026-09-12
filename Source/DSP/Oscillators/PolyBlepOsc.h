@@ -5,15 +5,13 @@
 
 namespace stabr
 {
-/*  Oscilador PolyBLEP.
+/*  Oscilador PolyBLEP: sierra, pulso con PWM y triangulo.
 
-    Fase 1 implementa solo sierra. Fase 3 agrega pulso con PWM y triangulo
-    (integrando el pulso); la forma tipo organo/M1 NO va aca: es una suma fija
-    de armonicos y necesita wavetable band-limited. Ver DECISIONS.md D-004.
+    La forma tipo organo/M1 NO va aca: es una suma fija de armonicos y necesita
+    wavetable band-limited. Ver OrganTable.h y DECISIONS.md D-004.
 
-    Diseño en SoA-friendly: la fase es un miembro simple y el proceso no toca
-    estado compartido, para poder SIMDizar las copias de unisono en Fase 3 sin
-    reescribir nada.
+    Diseno SoA-friendly: la fase es un miembro simple y el proceso no toca
+    estado compartido, para poder SIMDizar las copias de unisono sin reescribir.
 */
 class PolyBlepOsc
 {
@@ -32,9 +30,11 @@ public:
         phaseInc  = (float) (frequency / sampleRate);
     }
 
+    float getFrequency() const noexcept { return frequency; }
+
     /*  phase01 en 0..1. Fase fija = transitorio consistente entre notas (clave
         para que un stab suene igual cada vez que lo disparas). Fase aleatoria =
-        unisono mas gordo. Los dos modos se exponen en Fase 3. */
+        unisono mas gordo. */
     void reset (float phase01 = 0.0f) noexcept
     {
         phase = phase01 - std::floor (phase01);
@@ -42,6 +42,7 @@ public:
 
     float getPhase() const noexcept { return phase; }
 
+    //==========================================================================
     inline float processSaw() noexcept
     {
         const float value = 2.0f * phase - 1.0f;          // sierra ingenua
@@ -51,16 +52,58 @@ public:
         return corrected;
     }
 
+    /*  pulseWidth en 0..1. Se clampea para que el pulso nunca desaparezca:
+        con pw en 0 o 1 la salida seria DC constante. */
+    inline float processPulse (float pulseWidth) noexcept
+    {
+        const float pw = std::clamp (pulseWidth, 0.02f, 0.98f);
+
+        float value = phase < pw ? 1.0f : -1.0f;
+
+        // Flanco de subida en 0 (salto +2) y de bajada en pw (salto -2).
+        value += polyBlep (phase);
+
+        float fallingEdge = phase - pw;
+        if (fallingEdge < 0.0f)
+            fallingEdge += 1.0f;
+
+        value -= polyBlep (fallingEdge);
+
+        advance();
+        return value;
+    }
+
+    /*  Triangulo ingenuo, sin correccion de banda limitada.
+
+        A DIFERENCIA de sierra y pulso, el triangulo no tiene saltos de valor:
+        solo de pendiente. Sus armonicos caen como 1/n^2 en vez de 1/n, asi que
+        su aliasing arranca muchisimo mas abajo. Corregirlo requeriria polyBLAMP
+        (otra familia de residuos, mas caros).
+
+        Hay un test que MIDE su aliasing contra el de la sierra con PolyBLEP: si
+        alguna vez queda por encima, se justifica agregar polyBLAMP. Mientras
+        este por debajo, no.
+    */
+    inline float processTriangle() noexcept
+    {
+        const float value = phase < 0.5f ? (4.0f * phase - 1.0f)
+                                         : (3.0f - 4.0f * phase);
+        advance();
+        return value;
+    }
+
 private:
     inline void advance() noexcept
     {
         phase += phaseInc;
+
         if (phase >= 1.0f)
             phase -= 1.0f;
     }
 
-    /*  Residuo PolyBLEP de 2 muestras. Suaviza la discontinuidad del salto de
-        la sierra, que es de donde sale casi todo el aliasing. */
+    /*  Residuo PolyBLEP de 2 muestras, escalado para un salto de -2 (el de la
+        sierra). Suaviza la discontinuidad, que es de donde sale casi todo el
+        aliasing. */
     inline float polyBlep (float t) const noexcept
     {
         const float dt = phaseInc;

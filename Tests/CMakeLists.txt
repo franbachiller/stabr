@@ -16,6 +16,7 @@ add_executable(STABR_Tests
     test_performance.cpp
     test_chord.cpp
     test_router.cpp
+    test_character.cpp
 )
 
 target_link_libraries(STABR_Tests PRIVATE

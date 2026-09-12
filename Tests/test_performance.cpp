@@ -64,19 +64,61 @@ public:
                         + " % de un core, demasiado para lo poco que hace todavia");
         }
 
-        beginTest ("costo con la densidad al maximo (peor caso real)");
+        beginTest ("costo del unisono y del drive (peor caso real)");
         {
-            const auto r = measure (48000.0, 128, VoiceManager::kMaxPolyphony,
-                                    stabr::chord::kMaxDensity, 4.0);
+            /*  Aca es donde se ve si el presupuesto de osciladores (D-014) esta
+                bien puesto: es la configuracion que un usuario pondria para un
+                supersaw gordo, no un caso de laboratorio. */
+            logMessage ("  config                          | osc | voces | CPU de un core");
+            logMessage ("  --------------------------------+-----+-------+---------------");
 
-            logMessage ("  " + juce::String (VoiceManager::kMaxPolyphony) + " acordes x "
-                        + juce::String (stabr::chord::kMaxDensity) + " voces = "
-                        + juce::String (r.voiceCount) + " voces sonando -> "
-                        + juce::String (r.cpuPercent, 2) + " % de un core");
+            struct Case { const char* name; int unison; float drive; bool hq; };
 
-            expect (r.voiceCount > 0, "no sono ninguna voz");
-            expect (r.cpuPercent < 40.0,
-                    "el peor caso absoluto cuesta " + juce::String (r.cpuPercent, 2) + " %");
+            const Case cases[]
+            {
+                { "default (uni 1, drive off)     ", 1, 0.0f,  false },
+                { "uni 3, drive off               ", 3, 0.0f,  false },
+                { "uni 7, drive off               ", 7, 0.0f,  false },
+                { "uni 7, drive a tope (x2)       ", 7, 1.0f,  false },
+                { "uni 7, drive a tope (x4 HQ)    ", 7, 1.0f,  true  },
+            };
+
+            double worstRealtime = 0.0;
+            double hqCost = 0.0;
+
+            for (const auto& c : cases)
+            {
+                const auto r = measure (48000.0, 128, VoiceManager::kMaxPolyphony,
+                                        stabr::chord::kMaxDensity, 3.0,
+                                        c.unison, c.drive, c.hq);
+
+                logMessage ("  " + juce::String (c.name)
+                            + " | " + juce::String (r.oscCount).paddedLeft (' ', 3)
+                            + " | " + juce::String (r.voiceCount).paddedLeft (' ', 5)
+                            + " | " + (juce::String (r.cpuPercent, 2) + " %").paddedLeft (' ', 14));
+
+                if (c.hq)
+                    hqCost = r.cpuPercent;
+                else
+                    worstRealtime = juce::jmax (worstRealtime, r.cpuPercent);
+            }
+
+            logMessage ("");
+            logMessage ("  Presupuesto de osciladores: " + juce::String (VoiceManager::kOscillatorBudget)
+                        + " (es un techo BLANDO: nunca se tiran notas, asi que el minimo"
+                        + " de 1 unisono por voz puede pasarlo)");
+
+            /*  Solo se exige el peor caso de TIEMPO REAL. HQ Mode es x4 sobre
+                cada voz y esta pensado para render offline, donde la CPU no
+                importa: exigirle presupuesto de tiempo real seria pedirle algo
+                que no promete. Se reporta igual para que el numero este a la
+                vista. */
+            expect (worstRealtime < 60.0,
+                    "el peor caso de tiempo real cuesta " + juce::String (worstRealtime, 2)
+                        + " % de un core");
+
+            logMessage ("  HQ Mode (x4): " + juce::String (hqCost, 1)
+                        + " % en el peor caso. Es para render offline, no para tocar en vivo.");
         }
 
         beginTest ("costo con sample rates altos (8 acordes x 4 voces, buffer 128)");
@@ -115,6 +157,7 @@ private:
         double cpuPercent     = 0.0;   // % de un core para correr en tiempo real
         double microsPerBlock = 0.0;
         int    voiceCount     = 0;     // voces realmente sonando, medidas
+        int    oscCount       = 0;     // osciladores corriendo, medidos
     };
 
     static void setChoiceOrInt (juce::RangedAudioParameter* p, int value, int minV, int maxV)
@@ -126,7 +169,8 @@ private:
         p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, norm));
     }
 
-    static Result measure (double sr, int blockSize, int numChords, int density, double seconds)
+    static Result measure (double sr, int blockSize, int numChords, int density, double seconds,
+                           int unison = 1, float drive = 0.0f, bool hq = false)
     {
         StabrProcessor proc;
         proc.setPlayConfigDetails (0, 2, sr, blockSize);
@@ -145,6 +189,9 @@ private:
                         1, VoiceManager::kMaxPolyphony);
         setChoiceOrInt (apvts.getParameter (pid::chordDensity), density,
                         stabr::chord::kMinDensity, stabr::chord::kMaxDensity);
+        setChoiceOrInt (apvts.getParameter (pid::unisonCount), unison, 1, Voice::kMaxUnison);
+        apvts.getParameter (pid::driveAmount)->setValueNotifyingHost (drive);
+        apvts.getParameter (pid::hqMode)->setValueNotifyingHost (hq ? 1.0f : 0.0f);
 
         juce::AudioBuffer<float> buffer (2, blockSize);
 
@@ -188,6 +235,7 @@ private:
         r.cpuPercent     = elapsed > 0.0 ? 100.0 * elapsed / audioSeconds : 0.0;
         r.microsPerBlock = totalBlocks > 0 ? 1.0e6 * elapsed / totalBlocks : 0.0;
         r.voiceCount     = proc.getActiveVoiceCount();
+        r.oscCount       = proc.getOscillatorCount();
 
         return r;
     }

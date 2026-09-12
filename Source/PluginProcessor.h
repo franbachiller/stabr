@@ -6,6 +6,7 @@
 #include "Common/SilenceGate.h"
 #include "Chord/ChordGenerator.h"
 #include "Chord/NoteRouter.h"
+#include "Params/ParamCache.h"
 
 namespace stabr
 {
@@ -48,6 +49,7 @@ public:
 
     /*  Solo para tests y mediciones: no llamar desde la GUI sin un FIFO. */
     int getActiveVoiceCount() const noexcept { return voices.getActiveVoiceCount(); }
+    int getOscillatorCount()  const noexcept { return voices.getOscillatorCount(); }
 
 private:
     void timerCallback() override;
@@ -56,32 +58,13 @@ private:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // Punteros cacheados: buscar por string en processBlock seria hashing en el
-    // hilo de audio. Se resuelven una vez, en el constructor.
-    std::atomic<float>* pAmpAttack         = nullptr;
-    std::atomic<float>* pAmpDecay          = nullptr;
-    std::atomic<float>* pAmpSustain        = nullptr;
-    std::atomic<float>* pAmpRelease        = nullptr;
-    std::atomic<float>* pOsc1Level         = nullptr;
-    std::atomic<float>* pMasterGain        = nullptr;
-    std::atomic<float>* pPolyphony         = nullptr;
-    std::atomic<float>* pPitchBendRange    = nullptr;
-
-    std::atomic<float>* pChordType         = nullptr;
-    std::atomic<float>* pChordVoicing      = nullptr;
-    std::atomic<float>* pChordInversion    = nullptr;
-    std::atomic<float>* pChordSpread       = nullptr;
-    std::atomic<float>* pChordDensity      = nullptr;
-    std::atomic<float>* pChordOctaveDouble = nullptr;
-    std::atomic<float>* pScaleLock         = nullptr;
-    std::atomic<float>* pScaleKey          = nullptr;
-    std::atomic<float>* pScaleMode         = nullptr;
-    std::atomic<float>* pNoteMode          = nullptr;
+    ParamCache p;
 
     VoiceManager voices;
     NoteRouter router;
     NoteRouter::EventList events;
     chord::ChordParams chordParams;
+    VoiceParams voiceParams;
 
     SilenceGate silenceGate;
     juce::SmoothedValue<float> masterGainSmoothed;
