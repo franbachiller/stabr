@@ -10,6 +10,7 @@
 #include "FX/FxChain.h"
 #include "Sequencer/StepSequencer.h"
 #include "Sequencer/NoteLatch.h"
+#include "Common/GuiFeed.h"
 
 namespace stabr
 {
@@ -55,6 +56,15 @@ public:
         lo puede leer directo. */
     int getSequencerStep() const noexcept { return sequencer.getCurrentStep(); }
 
+    /*  Canal lock-free hacia la GUI: eventos de disparo y tiempos del delay. */
+    GuiFeed& getGuiFeed() noexcept { return guiFeed; }
+
+    /*  Escala de la interfaz. Atomico y no una propiedad del ValueTree: hay
+        hosts que guardan el estado desde otro hilo mientras la GUI cambia de
+        tamano. Se escribe en el estado al guardar. */
+    float getUiScale() const noexcept     { return uiScale.load (std::memory_order_relaxed); }
+    void  setUiScale (float s) noexcept   { uiScale.store (juce::jlimit (0.75f, 2.0f, s), std::memory_order_relaxed); }
+
     /*  Solo para tests y mediciones: no llamar desde la GUI sin un FIFO. */
     int getActiveVoiceCount() const noexcept { return voices.getActiveVoiceCount(); }
     int getOscillatorCount()  const noexcept { return voices.getOscillatorCount(); }
@@ -74,6 +84,13 @@ private:
     void applySequencerEvent (const seq::StepSequencer::Event&) noexcept;
     void triggerSequencedChord (float velocity) noexcept;
     void updateParametersForBlock() noexcept;
+    void publishToGui() noexcept;
+
+    GuiFeed guiFeed;
+    chord::ChordResult lastPublishedNotes;
+    int triggersThisBlock = 0;
+    float lastTriggerVelocity = 0.0f;
+    std::atomic<float> uiScale { 1.0f };
 
     juce::AudioProcessorValueTreeState apvts;
 

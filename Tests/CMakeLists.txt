@@ -19,6 +19,7 @@ add_executable(STABR_Tests
     test_character.cpp
     test_fx.cpp
     test_sequencer.cpp
+    test_gui.cpp
 )
 
 target_link_libraries(STABR_Tests PRIVATE

@@ -19,6 +19,10 @@ namespace state
     inline const juce::Identifier versionProperty { "stateVersion" };
     inline const juce::Identifier rootType        { "STABR" };
 
+    /*  Escala de la interfaz (0.75..2). No es un parametro: no se automatiza
+        ni le importa al host, pero se guarda con el proyecto. */
+    inline const juce::Identifier uiScaleProperty { "ui_scale" };
+
     /*  Se llama en el hilo de mensajes, nunca en audio. Puede asignar memoria. */
     inline void migrate (juce::ValueTree& tree)
     {

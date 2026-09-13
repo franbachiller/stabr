@@ -125,10 +125,17 @@ incorporación futura se anota acá con su licencia, y **debe ser permisiva**.
 
 ### Tipografías
 
-Si en la Fase 6 se embebe una tipografía custom vía `BinaryData`, tiene que
-tener licencia que permita **embeber en software distribuido**. Las de
-Google Fonts bajo **SIL OFL 1.1** sirven; muchas comerciales cobran licencia
-de embedding aparte. La licencia elegida se documenta acá.
+**Decisión de la Fase 6: no se embebe ninguna tipografía.** La interfaz usa las
+fuentes del sistema (la sans por defecto y la monoespaciada por defecto de JUCE,
+en Windows Segoe UI y Consolas). No se copian ni se redistribuyen: el plugin
+sólo le pide al sistema operativo que dibuje con ellas, así que no hay licencia
+de embedding que resolver. Ver [DECISIONS.md](DECISIONS.md) D-042.
+
+Si más adelante se quiere una letra propia (por identidad, o para que la
+interfaz se vea igual en otros sistemas), tiene que tener licencia que permita
+**embeber en software distribuido**. Las de Google Fonts bajo **SIL OFL 1.1**
+sirven; muchas comerciales cobran licencia de embedding aparte. La licencia
+elegida se documenta acá.
 
 ---
 
@@ -139,5 +146,5 @@ de embedding aparte. La licencia elegida se documenta acá.
 - [ ] Revisar los lineamientos de marca VST de Steinberg para el material de marketing
 - [ ] (Si se decide sacar macOS) mac o CI con runners macOS, cuenta Apple Developer y notarización
 - [ ] Firma de código en Windows (certificado EV o el SmartScreen espanta usuarios)
-- [ ] Verificar la licencia de embedding de la tipografía de la GUI
+- [x] Tipografía de la GUI: fuentes del sistema, sin embedding (Fase 6). Revisar sólo si se embebe una
 - [ ] Confirmar que no entró ningún código GPL/AGPL al árbol

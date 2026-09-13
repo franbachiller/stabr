@@ -6,7 +6,7 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Deployment target macOS")
 endif()
 
-project(STABR VERSION 0.5.0 LANGUAGES C CXX)
+project(STABR VERSION 0.6.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -73,6 +73,12 @@ target_sources(STABR PRIVATE
     Source/Chord/ChordGenerator.cpp
     Source/Chord/NoteRouter.cpp
     Source/Sequencer/StepSequencer.cpp
+    Source/GUI/StabrLookAndFeel.cpp
+    Source/GUI/Controls.cpp
+    Source/GUI/ChordVisualizer.cpp
+    Source/GUI/DelayVisualizer.cpp
+    Source/GUI/StepGrid.cpp
+    Source/GUI/MainView.cpp
 )
 
 target_include_directories(STABR PUBLIC Source)

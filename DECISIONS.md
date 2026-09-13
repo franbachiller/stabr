@@ -782,3 +782,91 @@ El bug del pump ya existía en la Fase 4 y no se veía porque ningún test
 combinaba modo `Auto` con el transporte. Salió al diseñar el secuenciador,
 pensando qué pasaba con sus disparos en ese modo. Hay un test que verifica que
 con 960 muestras de latencia el primer disparo cae en 12000 + 960.
+
+---
+
+## D-042 · Fase 6 · Identidad visual: "Máquina" con el visualizador de acorde de "Fósforo"
+
+**Decisión del usuario**, entre tres direcciones presentadas como maquetas:
+la **A** (hardware de estudio: grafito, un solo acento naranja de LED,
+perillas con cuerpo) con el **visualizador de acorde de la C** (notas ubicadas
+por altura en lugar de un teclado). El delay usa los puntos estéreo de la A.
+
+Decisiones internas que salen de ahí:
+
+- **El nombre del acorde se detecta de las notas que suenan**, no se lee del
+  parámetro (`Chord/ChordNaming.h`). Con scale lock en Diatonic la calidad la
+  pone la escala: con "Min7" elegido en La menor, la tecla Si suena Bm7b5 y la
+  Sol, G7. Mostrar "Min7" sería mentir justo en el componente que existe para
+  explicar qué se está tocando. Hay test sobre 1920 combinaciones de
+  fundamental, inversión y voicing, y reproduce la tabla del README.
+- **Por altura y no en un teclado** porque así se ven el voicing, la separación
+  y el bajo, que son justamente lo que cambian Voicing, Inversion y Spread.
+- **Audio → GUI por FIFO lock-free** (`Common/GuiFeed.h`): un evento por bloque
+  como máximo, sin esperar ni asignar. Si el editor está cerrado la cola se
+  llena y se descarta. Los tiempos reales del delay (con el glide) y el BPM van
+  en atómicos. La GUI no lee estado del hilo de audio.
+- **Un disparo se publica siempre, aunque el acorde sea el mismo.** El
+  secuenciador repite el mismo acorde en cada paso, y el visualizador de delay
+  necesita cada golpe para encender sus repeticiones. Test: dos compases de
+  contratiempos publican exactamente 8 disparos.
+- **Los paneles secundarios se arman desde listas de IDs** y el tipo de control
+  sale del tipo de parámetro (Choice → selector, Bool → LED, resto → perilla).
+  Un parámetro nuevo no necesita código de GUI.
+- **Fuentes del sistema, no embebidas**: no hay licencia de tipografía que
+  resolver (ver LICENSING.md). El costo es que en otro sistema operativo la
+  interfaz se vería con otra letra.
+
+---
+
+## D-043 · Fase 6 · La escala es una transformación, y vive en un atómico
+
+**Decisión:** la interfaz se diseña a un único tamaño base (1100 × 700) y el
+editor la escala entera con `AffineTransform::scale`, de 0,75× a 2×. La escala
+se guarda en un atómico del procesador y se escribe en el estado al guardar.
+
+**Motivo de la transformación:** todo es vectorial, así que se ve nítido a
+cualquier escala, y el layout no necesita saber nada de escalas: se prueba una
+sola vez.
+
+**Motivo del atómico:** escribir la escala como propiedad del `ValueTree`
+desde `resized()` compite con los hosts que guardan el estado desde otro hilo.
+
+**Bug que encontró el test de persistencia:** todo proyecto abría la interfaz
+al **75 %**. En el constructor, `setResizeLimits` acota el tamaño inicial (0×0)
+al mínimo, eso dispara `resized()`, y `resized()` escribía 0,75 en el
+procesador **antes** de que el constructor leyera la escala guardada. Ahora se
+lee primero.
+
+---
+
+## D-044 · Fase 6 · Cómo se testea una interfaz
+
+Los tests de la GUI verifican cosas que se pueden medir, no "que se vea bien":
+
+- **Todo parámetro tiene control:** 163 de 163. Cada control lleva el ID en una
+  propiedad y el test recorre el árbol de componentes.
+- **Nada se sale de su panel ni se pisa con otro**, en las 7 pestañas: 141
+  elementos revisados.
+- **Accesibilidad:** los 123 controles interactivos tienen nombre accesible y
+  se alcanzan con teclado. La cuenta es **exacta**, no un umbral: la primera
+  versión pedía "más de 150" (un número puesto sin pensar) y falló, porque los
+  64 parámetros de los pasos viven en 16 celdas. El chequeo de fondo había
+  pasado; el umbral estaba mal.
+- **Contraste WCAG medido sobre la paleta:** texto secundario sobre panel
+  **5,51** (mínimo 4,5), acento sobre fondo **6,59** (mínimo 3).
+- **Costo de dibujo:** un cuadro completo por software tarda ~65 ms a 1× y a 2×.
+  Es el peor caso: en pantalla sólo repintan los visualizadores, y sólo mientras
+  animan.
+
+Y lo que ningún test ve: **las capturas se miran**. El test puede volcar las 7
+pestañas a PNG (con `STABR_SNAPSHOT_DIR`), y mirarlas encontró dos problemas
+que los tests de layout dejaban pasar: los selectores de tonalidad heredaban la
+letra del de acorde y partían "Natural Minor" en dos renglones, y el visualizador
+de delay parecía usar sólo la mitad del ancho.
+
+El segundo **no era un bug**: el volcado se tomaba dos bloques después de
+preparar el plugin, cuando el delay en modo cinta todavía deslizaba desde 0
+(19,5 ms en vez de 375 ms). Se diagnosticó imprimiendo los tiempos reales que
+recibía el visualizador, no leyendo el código, y lo que se corrigió fue el
+test.

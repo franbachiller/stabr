@@ -1,43 +1,43 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include <juce_gui_extra/juce_gui_extra.h>
-#include <vector>
-#include <memory>
+#include <juce_gui_basics/juce_gui_basics.h>
+
+#include "GUI/MainView.h"
+#include "GUI/StabrLookAndFeel.h"
 
 namespace stabr
 {
 class StabrProcessor;
 
-/*  EDITOR PLACEHOLDER DE FASE 1.
+/*  El editor solo hace tres cosas: pone el LookAndFeel, escala la vista, y
+    le da el pulso de animacion en cada VBlank. Toda la interfaz vive en
+    GUI/MainView.
 
-    Es deliberadamente feo y generico. Existe solo para poder tocar los
-    parametros mientras se desarrolla el DSP y para que pluginval tenga una
-    ventana que abrir y cerrar. Se tira entero en Fase 6, donde arranca la
-    identidad visual real (LookAndFeel propio, vectorial, sin rotarys estandar).
+    VBlankAttachment y no un Timer: sincroniza con el refresco real del
+    monitor, y el Timer a 60 Hz repintando todo es exactamente lo que el brief
+    pide evitar. Los visualizadores ademas solo repintan si hay animacion.
 */
-class StabrEditor : public juce::AudioProcessorEditor
+class StabrEditor final : public juce::AudioProcessorEditor
 {
 public:
+    static constexpr float kMinScale = 0.75f;
+    static constexpr float kMaxScale = 2.0f;
+
     explicit StabrEditor (StabrProcessor&);
-    ~StabrEditor() override = default;
+    ~StabrEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
 
-private:
-    struct Row
-    {
-        juce::Label label;
-        juce::Slider slider;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-    };
+    void setUiScale (float scale);
+    gui::MainView& getView() noexcept { return view; }
 
+private:
+    gui::StabrLookAndFeel lookAndFeel;
     StabrProcessor& proc;
-    juce::Label title;
-    juce::Viewport viewport;
-    juce::Component rowHolder;
-    std::vector<std::unique_ptr<Row>> rows;
+    gui::MainView view;
+    juce::VBlankAttachment vblank;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StabrEditor)
 };

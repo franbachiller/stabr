@@ -31,6 +31,8 @@ void StabrProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     sequencer.prepare (sampleRate);
     latch.reset();
     sequencerWasRunning = false;
+    lastPublishedNotes = {};
+    triggersThisBlock = 0;
 
     masterGainSmoothed.reset (sampleRate, 0.02);
     masterGainSmoothed.setCurrentAndTargetValue (
@@ -149,6 +151,12 @@ void StabrProcessor::updateParametersForBlock() noexcept
     fxChain.setParams (fxParams, bpm);
     fxChain.setTransport (ppq - latencyBeats, bpm, playing, positionValid);
 
+    // Para el visualizador de delay: tiempos reales, con el glide de cinta.
+    const double sr = juce::jmax (1.0, getSampleRate());
+    guiFeed.bpm.store ((float) bpm, std::memory_order_relaxed);
+    guiFeed.delayTimeL.store ((float) (fxChain.getDelay().getDelaySamplesL() / sr), std::memory_order_relaxed);
+    guiFeed.delayTimeR.store ((float) (fxChain.getDelay().getDelaySamplesR() / sr), std::memory_order_relaxed);
+
     masterGainSmoothed.setTargetValue (
         juce::Decibels::decibelsToGain (p.masterGain->load(), -60.0f));
 }
@@ -183,6 +191,9 @@ void StabrProcessor::applyEvent (const NoteRouter::Event& e, bool sequencerRunni
             {
                 voices.noteOnSingle (e.note, e.velocity);
             }
+
+            ++triggersThisBlock;
+            lastTriggerVelocity = e.velocity;
             break;
         }
 
@@ -231,6 +242,9 @@ void StabrProcessor::triggerSequencedChord (float velocity) noexcept
 
         Todo entra al motor de voces como UN disparo con el mismo trigger: el
         acorde anterior se suelta solo y el robo sigue siendo por acorde. */
+    ++triggersThisBlock;
+    lastTriggerVelocity = velocity;
+
     if (latch.isEmpty())
     {
         const int root = kFallbackRootBase + chordParams.keyRoot;
@@ -315,6 +329,8 @@ void StabrProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     if (startSample < numSamples)
         voices.renderAdd (buffer, startSample, numSamples - startSample);
 
+    publishToGui();
+
     // Ganancia de las voces antes de los efectos: mover el master DESPUES del
     // delay cambiaria el nivel de las repeticiones ya en el lazo.
     if (masterGainSmoothed.isSmoothing())
@@ -379,6 +395,30 @@ void StabrProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 }
 
 //==============================================================================
+void StabrProcessor::publishToGui() noexcept
+{
+    /*  Un evento por bloque como mucho, sin asignar memoria y sin esperar: si
+        la GUI esta cerrada la cola se llena y los eventos se descartan.
+
+        Un disparo se publica SIEMPRE, aunque el acorde sea el mismo: el
+        secuenciador repite el mismo acorde en cada paso, y el visualizador de
+        delay necesita cada golpe para encender sus repeticiones. */
+    const auto sounding = voices.getSoundingNotes();
+
+    bool changed = sounding.count != lastPublishedNotes.count;
+
+    for (int i = 0; ! changed && i < sounding.count; ++i)
+        changed = sounding[i] != lastPublishedNotes[i];
+
+    if (triggersThisBlock > 0)
+        guiFeed.push ({ GuiEvent::Type::onset, sounding, lastTriggerVelocity });
+    else if (changed)
+        guiFeed.push ({ GuiEvent::Type::notesChanged, sounding, 0.0f });
+
+    lastPublishedNotes = sounding;
+    triggersThisBlock = 0;
+}
+
 juce::AudioProcessorEditor* StabrProcessor::createEditor()
 {
     return new StabrEditor (*this);
@@ -388,6 +428,7 @@ void StabrProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto tree = apvts.copyState();
     tree.setProperty (state::versionProperty, state::kCurrentVersion, nullptr);
+    tree.setProperty (state::uiScaleProperty, getUiScale(), nullptr);
 
     if (auto xml = tree.createXml())
         copyXmlToBinary (*xml, destData);
@@ -406,6 +447,9 @@ void StabrProcessor::setStateInformation (const void* data, int sizeInBytes)
         return;
 
     state::migrate (tree);
+
+    if (tree.hasProperty (state::uiScaleProperty))
+        setUiScale ((float) (double) tree.getProperty (state::uiScaleProperty));
 
     /*  Los parametros que un proyecto viejo no trae (los del secuenciador en un
         proyecto de la v0.4) quedan en su DEFAULT, no en el valor que tuviera la

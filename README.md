@@ -13,13 +13,37 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 5 completa y verificada.** El stab toca solo: secuenciador de 16 pasos
-alineado al transporte del host, con swing, ratchets, probabilidad por paso,
-cuatro patrones de fábrica y latch.
+**Fase 6 completa y verificada.** STABR tiene cara propia: interfaz vectorial,
+escalable de 0,75× a 2×, con visualizador de acorde y de delay animados.
 
-Build limpio sin warnings, 2.226.589 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.228.617 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
 buffer (32 a 2048), con 163 parámetros.
+
+### La interfaz
+
+Estilo hardware de estudio: grafito, un solo acento naranja, perillas con
+cuerpo. Arriba y siempre a la vista, lo que más se toca: acorde y tonalidad,
+cutoff / resonancia / decay, el delay y el secuenciador. El resto, en siete
+pestañas.
+
+- **Visualizador de acorde:** las notas que suenan, ubicadas por altura, así se
+  ve el voicing y qué nota queda en el bajo. Arriba, el nombre **detectado** del
+  acorde: con Diatonic, "Min7" en la tecla Si se muestra como lo que suena,
+  Bm7b5.
+- **Visualizador de delay:** cada repetición en el tiempo y en el estéreo
+  (L arriba, R abajo), calculada con el mismo modelo que el delay, y encendida
+  por cada golpe real.
+- **Grilla de pasos:** clic enciende, arrastrar ajusta la velocity, clic
+  derecho abre ratchet y probabilidad. Editar un patrón de fábrica lo copia a
+  `Custom`.
+- **Teclado:** todo control se alcanza con Tab; flechas para mover perillas y
+  pasos, espacio para encender. Doble clic vuelve una perilla a su default.
+
+Verificado por test: los 163 parámetros tienen control, nada se superpone en
+ninguna pestaña, los 123 controles interactivos tienen nombre accesible, y el
+contraste del texto secundario es 5,51:1 (WCAG pide 4,5). Detalle en
+[D-044](DECISIONS.md).
 
 ### El secuenciador
 
@@ -149,7 +173,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 | 3 | Carácter: osciladores, unísono, filtro SVF, drive | **completa** |
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | **completa** |
 | 5 | Secuenciador: gate rítmico, swing, sync al host | **completa** |
-| 6 | Identidad visual: GUI completa con visualizadores | — |
+| 6 | Identidad visual: GUI completa con visualizadores | **completa** |
 | 7 | Presets, pulido, distribución | — |
 
 ---
@@ -244,14 +268,14 @@ descarga pluginval a `Tools/` la primera vez.
 ```
 Source/
   PluginProcessor.*     procesador principal, dispatch de MIDI por sub-bloque
-  PluginEditor.*        GUI placeholder (se tira entera en Fase 6)
+  PluginEditor.*        escala la interfaz y le da el pulso de animacion (VBlank)
   Params/               IDs estables y layout de parámetros
   DSP/                  voces, osciladores, filtros, drive, robo por acorde
   Common/               utilidades compartidas (silencio, versionado de estado)
   Chord/                generador de acordes, escalas y ruteo de notas
   FX/                   delay, reverb, chorus, saturacion, pump, salida
   Sequencer/            secuenciador de pasos, patrones de fabrica, latch
-  GUI/                  fase 6
+  GUI/                  LookAndFeel, controles, visualizadores, grilla de pasos
 Tests/                  tests headless
 Scripts/                build, validación y el .bat de instalación
 cmake/                  JUCE pinneada, flags de warnings
