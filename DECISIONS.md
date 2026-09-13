@@ -1028,10 +1028,8 @@ Sin bitmaps el aparato queda nítido de 75 % a 200 %.
 - La tecla "Play" del mockup se llama **▶ SEQ**: no controla el transporte del
   DAW, enciende el secuenciador. Un nombre que prometa otra cosa sería mentira.
 
-**Tipografías:** el mockup usa Michroma, Archivo Narrow y Reenie Beanie (OFL).
-Hasta que se autorice descargarlas, el código cae a fuentes del sistema de
-Windows (Bahnschrift y Segoe Print), que no se redistribuyen. El soporte para
-embeberlas ya está (`STABR_HAS_EMBEDDED_FONTS`).
+**Tipografías:** las de la maqueta (Michroma, Archivo Narrow, Reenie Beanie),
+embebidas desde la Fase 8. Ver D-050 y LICENSING.md.
 
 **Verificado por test:** los 163 parámetros alcanzables; las 16 subpáginas
 enganchan los encoders correctos; 46 piezas sin salirse ni pisarse; 19
@@ -1041,3 +1039,57 @@ barridos); contraste WCAG ≥ 4,5 en los tres acabados (serigrafía 7,8 / 7,8 /
 8,1; pantalla 6,2 / 10,8 / 7,7); escala, acabado y cinta sobreviven a
 guardar y reabrir. Un cuadro completo del aparato cuesta ~50 ms en render por
 software en el peor caso; en uso real solo se repinta lo que cambia.
+
+## D-050 · Fase 8 · Tipografía exacta y movimiento con física
+
+**Pedido del usuario:** "exactamente como la preview", que todo se sienta
+placentero, "animaciones fluidas y sutiles", atención extrema al detalle.
+
+**Tipografía igual al CSS.** Las tres fuentes van embebidas (LICENSING.md). JUCE
+mide la altura como ascendente + descendente y el kerning como proporción de esa
+altura; el CSS mide en em. `fonts::` convierte: pide la fuente por
+`withPointHeight` (el `font-size` del CSS) y pasa el `letter-spacing` de em a
+factor de JUCE. Verificado: .2 em a 10 px agrega 2 px por letra. El texto se
+ubica como una caja de `line-height: 1`, con las coordenadas de la maqueta.
+
+**Todo el movimiento depende del tiempo real, no de los cuadros.** Cada pieza
+recibe el dt del VBlank (acotado a 50 ms) y se mueve igual a 60 que a 144 Hz;
+un test lo compara. Los tiempos salen de las transiciones de la maqueta:
+
+| Pieza | Movimiento |
+|---|---|
+| Teclas de goma | se hunden 2 px en ~60 ms; un clic más corto que un cuadro igual se ve (70 ms mínimo); brillo al pasar el mouse |
+| LEDs | prenden en ~75 ms y se apagan con cola de ~240 ms |
+| Pad STAB | resorte: se hunde 6 px firme, al soltar rebota ~1 px; el resplandor se apaga con cola |
+| Pads de pasos | el que suena se hunde 3 px y se enciende en 50 ms, se apaga con cola; al presionar se hunden 1,5 px |
+| Palancas LOCK | giran sobre la tuerca en 120 ms, con la palanca acortándose al pasar de frente |
+| Disquetera | expulsa y carga en .28 s + .28 s con `cubic-bezier(.3,.7,.3,1)`; piloto verde 650 ms |
+| Perillas | al cambiar el sonido giran .45 s ease-out cúbico, escalonadas de izquierda a derecha (70 ms en total) |
+| Selectores | caen en cada posición en 70 ms; rueda y teclado giran suave en 100 ms |
+| Aguja VU | resorte de 2,1 Hz con amortiguación .78: la balística de un VU real (~300 ms, pasa apenas de largo) |
+| Pantallas | cada punto prende en ~35 ms y se apaga en ~120 ms, como un cristal líquido |
+| Patrón | la posición elegida se enciende en 150 ms |
+
+**Ergonomía:** arrastrar una perilla es directo (190 px el recorrido, como la
+maqueta); con Shift, ajuste fino a 700 px, sin salto al apretarlo en medio del
+arrastre. Un clic de rueda mueve 2,5 % o un paso en los selectores. Cursores:
+mano en teclas y pads, flecha vertical en perillas.
+
+**Sombras reales.** Los `box-shadow` de la maqueta se dibujan como capas
+concéntricas (sin desenfocar imágenes por cuadro). Las piezas con sombra
+pintan sin recorte y repintan el margen donde cae la sombra.
+
+**Dos desvíos de la maqueta, a propósito:**
+
+- **La palanca LOCK.** El CSS la voltea con origen en su base y la manda 26 px
+  hacia abajo: encendida, quedaba colgando fuera de la placa, tapando el piloto
+  y la serigrafía. Acá gira sobre la tuerca, como una palanca real, y queda
+  dentro de la placa.
+- **Las perillas.** En el CSS gira la tapa entera, sombras y reflejo del cuerpo
+  incluidos, así que la sombra cambiaba de lado según el valor. Acá la luz del
+  estudio queda fija. Giran el moleteado, el aluminio y el indicador, que es lo
+  que se mueve en una perilla de verdad.
+
+**VU calibrado:** 0 VU = −12 dBFS de pico. Un stab calibrado a −18 dB de golpe
+(D-046) lleva la aguja alrededor del cero. La escala no es lineal: se interpola
+entre las marcas de la cara (−20, −10, −7, −5, −3, 0, +3).

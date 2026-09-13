@@ -45,6 +45,12 @@ eligen desde POWER.
   **LOCK** protegen acorde, efectos o secuencia.
 - **Disquetera:** la lista de sonidos; el color del disquete dice el estilo.
 - **Cinta:** doble clic para escribirle el nombre de tu tema.
+- **Movimiento:** teclas que se hunden, un pad STAB de goma que rebota,
+  palancas que giran, un disquete que se expulsa y carga, aguja con balística
+  de VU real y pantallas con la inercia de un cristal líquido. Todo con los
+  tiempos de la maqueta e independiente de los Hz del monitor
+  ([D-050](DECISIONS.md)). Shift para ajuste fino en las perillas.
+- **Tipografía:** Michroma, Archivo Narrow y Reenie Beanie embebidas (OFL).
 
 Verificado por test ([D-049](DECISIONS.md)): los 163 parámetros tienen control,
 46 piezas sin pisarse, todo control con nombre accesible y foco de teclado,

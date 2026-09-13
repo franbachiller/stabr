@@ -125,18 +125,28 @@ incorporación futura se anota acá con su licencia, y **debe ser permisiva**.
 
 ### Tipografías
 
-**Fase 8 (SP-92), estado actual: no se embebe ninguna tipografía.** La interfaz
-usa fuentes que trae Windows: **Bahnschrift** (marca y serigrafía) y **Segoe
-Print** (la cinta escrita a mano). No se copian ni se redistribuyen: el plugin
-sólo le pide al sistema operativo que dibuje con ellas, así que no hay licencia
-de embedding que resolver. Ver [DECISIONS.md](DECISIONS.md) D-042 y D-049.
+**Fase 8 (SP-92): tres tipografías embebidas, las tres bajo SIL OFL 1.1.**
+Descargadas el 2026-09-13 con autorización del usuario.
 
-**Previsto:** el diseño aprobado usa **Michroma**, **Archivo Narrow** y
-**Reenie Beanie**, las tres de Google Fonts bajo **SIL OFL 1.1**, que permite
-embeberlas en software comercial siempre que se incluya el texto de la licencia
-y no se vendan las fuentes solas. El código ya soporta embeberlas
-(`STABR_HAS_EMBEDDED_FONTS`); falta autorización para descargarlas. Al hacerlo:
-copiar `OFL.txt` de cada una al instalador y marcar esta sección.
+| Fuente | Uso | Origen | Licencia |
+|---|---|---|---|
+| Michroma Regular | marca, modelo, pad STAB, VU | github.com/google/fonts (`ofl/michroma`) | OFL 1.1 |
+| Archivo Narrow SemiBold (600) y Bold (700) | serigrafía, teclas, pantallas chicas | fonts.gstatic.com, instancias estáticas de Google Fonts | OFL 1.1 |
+| Reenie Beanie Regular | disquetes y cinta escritos a mano | github.com/google/fonts (`ofl/reeniebeanie`) | OFL 1.1 |
+
+Archivo Narrow viene en el repositorio de Google solo como fuente variable, y
+JUCE no elige pesos dentro de una fuente variable: por eso se usan las dos
+instancias estáticas que sirve Google Fonts, las mismas que usa la maqueta.
+
+La OFL permite embeberlas y distribuirlas dentro de software comercial con dos
+condiciones que se cumplen así:
+
+- **Incluir la licencia:** los textos están en `Resources/Fonts/OFL-*.txt` y el
+  instalador los copia a `{app}\Licenses`.
+- **No vender las fuentes solas:** van compiladas dentro del binario del plugin
+  (`juce_add_binary_data`), nunca como archivos sueltos.
+
+No se modificaron, así que no aplica la cláusula de nombre reservado.
 
 Si más adelante se quiere una letra propia (por identidad, o para que la
 interfaz se vea igual en otros sistemas), tiene que tener licencia que permita
@@ -153,5 +163,5 @@ elegida se documenta acá.
 - [ ] Revisar los lineamientos de marca VST de Steinberg para el material de marketing
 - [ ] (Si se decide sacar macOS) mac o CI con runners macOS, cuenta Apple Developer y notarización
 - [ ] Firma de código en Windows (certificado EV o el SmartScreen espanta usuarios)
-- [x] Tipografía de la GUI: fuentes del sistema, sin embedding (Fase 8). Si se embeben las OFL, incluir sus licencias
+- [x] Tipografías de la GUI: Michroma, Archivo Narrow y Reenie Beanie embebidas, OFL 1.1, licencias en el instalador (Fase 8)
 - [ ] Confirmar que no entró ningún código GPL/AGPL al árbol

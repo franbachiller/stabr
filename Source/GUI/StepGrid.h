@@ -23,6 +23,9 @@ inline const juce::Identifier stepParamIdsProperty { "stabrStepParamIDs" };
 
     Si el patron elegido es de fabrica, los pads lo MUESTRAN, y la primera
     edicion lo copia a los pasos editables y pasa a Custom (D-039).
+
+    Movimiento (maqueta: transform .05 s, box-shadow .12 s): el pad que suena se
+    hunde 3 px y se enciende; al pasar el paso se apaga con cola.
 */
 class StepGrid final : public juce::Component
 {
@@ -31,7 +34,9 @@ public:
     ~StepGrid() override;
 
     void resized() override;
-    void tick (int playingStep);
+
+    /*  dt < 0: salta al estado final sin animar. */
+    void tick (int playingStep, float dt = -1.0f);
 
     seq::Step getDisplayedStep (int index) const;
     bool isCustomPattern() const;

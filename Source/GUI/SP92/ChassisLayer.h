@@ -12,7 +12,10 @@ namespace stabr::gui::sp92
     los pads, placa de serie y tornillos.
 
     Se pinta una vez y queda en una imagen (setBufferedToImage): cambia solo
-    con el acabado o la escala, nunca en la animacion. */
+    con el acabado o la escala, nunca en la animacion.
+
+    Medidas y tipografia salen del CSS de la maqueta aprobada: y es el borde
+    superior de una caja de line-height 1, como en la maqueta. */
 class ChassisLayer final : public juce::Component
 {
 public:
@@ -20,6 +23,7 @@ public:
 
     void setFinish (const Finish&);
 
+    /*  Serigrafia: 11 px .16 em, o 9 px .14 em en gris si small. */
     void addSilk (const juce::String& text, float x, float y, bool centred = true, bool small = false);
     void addHead (const juce::String& text, juce::Rectangle<float> area);
     void addBezel (juce::Rectangle<float> area, const juce::String& tinyText = {});

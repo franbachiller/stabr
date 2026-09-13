@@ -5,6 +5,11 @@
 #include "GUI/SP92/Finish.h"
 #include "GUI/SP92/LcdPages.h"
 #include "GUI/SP92/DotMatrix.h"
+#include "GUI/SP92/Anim.h"
+#include "GUI/SP92/ButtonMotion.h"
+#include "GUI/SP92/Hardware.h"
+#include "GUI/SP92/HardwareKnob.h"
+#include "GUI/SP92/Sp92Fonts.h"
 #include "GUI/Palette.h"
 #include "GUI/StepGrid.h"
 #include "GUI/EchoModel.h"
@@ -568,12 +573,12 @@ public:
             for (int i = 0; i < gui::sp92::kNumFinishes; ++i)
             {
                 const auto& f = gui::sp92::finish (i);
-                const juce::String name (f.name);
+                const juce::String finishName (f.name);
 
                 auto check = [&] (juce::Colour a, juce::Colour b, double minimum, const char* what)
                 {
                     const double ratio = gui::contrastRatio (a, b);
-                    expect (ratio >= minimum, name + ": " + what + " " + juce::String (ratio, 2));
+                    expect (ratio >= minimum, finishName + ": " + what + " " + juce::String (ratio, 2));
                     return ratio;
                 };
 
@@ -583,7 +588,7 @@ public:
                 check (f.keyInk, f.key, 4.5, "tecla clara");
                 check (gui::sp92::darkKey::ink, gui::sp92::darkKey::base, 4.5, "tecla oscura");
 
-                logMessage (name + ": serigrafia " + juce::String (silk, 2) + ", pantalla " + juce::String (lcd, 2));
+                logMessage (finishName + ": serigrafia " + juce::String (silk, 2) + ", pantalla " + juce::String (lcd, 2));
             }
         }
 
@@ -710,34 +715,178 @@ public:
             {
                 editor->setUiScale (1.0f);
 
-                auto save = [&] (const juce::String& name)
+                auto save = [&] (const juce::String& fileName)
                 {
                     auto image = editor->createComponentSnapshot (editor->getLocalBounds());
-                    juce::File file (juce::File (dir).getChildFile (name));
+                    juce::File file (juce::File (dir).getChildFile (fileName));
                     file.deleteFile();
                     juce::FileOutputStream stream (file);
                     juce::PNGImageFormat().writeImageToStream (image, stream);
                     logMessage ("snapshot: " + file.getFullPathName());
                 };
 
+                // Cuarenta cuadros a 60 Hz: todo lo que se mueve llega a su reposo.
+                auto settle = [&] (double from)
+                {
+                    for (int i = 0; i < 40; ++i)
+                        view.tick (from + i / 60.0);
+                };
+
                 for (int f = 0; f < gui::sp92::kNumFinishes; ++f)
                 {
                     editor->setFinish (f);
                     proc.processBlock (buffer, on);
-                    view.tick (t0 + 1.0 + f);
-                    view.tick (t0 + 1.25 + f);
+                    settle (t0 + 1.0 + f);
                     save ("sp92_finish_" + juce::String (f) + ".png");
                 }
 
                 editor->setFinish (1);
                 view.selectPage (2, 0);
-                view.tick (t0 + 10.0);
+                settle (t0 + 10.0);
                 save ("sp92_filter_page.png");
             }
         }
     }
 };
 
+//==============================================================================
+class MotionTests : public juce::UnitTest
+{
+public:
+    MotionTests() : juce::UnitTest ("SP-92 motion y tipografia", "GUI") {}
+
+    void runTest() override
+    {
+        using namespace gui::sp92;
+
+        beginTest ("las tres tipografias de la maqueta van embebidas y cargan");
+        {
+            expect (fonts::usingEmbeddedFonts(), "el binario no trae las fuentes");
+
+            auto typefaceName = [] (const juce::Font& f)
+            {
+                auto tf = f.getTypefacePtr();
+                return tf != nullptr ? tf->getName() : juce::String();
+            };
+
+            expect (typefaceName (fonts::display (12.0f)).containsIgnoreCase ("Michroma"), typefaceName (fonts::display (12.0f)));
+            expect (typefaceName (fonts::label (12.0f)).containsIgnoreCase ("Archivo Narrow"), typefaceName (fonts::label (12.0f)));
+            expect (typefaceName (fonts::labelBold (12.0f)).containsIgnoreCase ("Archivo Narrow"), typefaceName (fonts::labelBold (12.0f)));
+            expect (typefaceName (fonts::hand (12.0f)).containsIgnoreCase ("Reenie"), typefaceName (fonts::hand (12.0f)));
+
+            // letter-spacing en em, como el CSS: .2 em a 10 px son 2 px por letra.
+            const float plain  = fonts::textWidth (fonts::label (10.0f), "ABCDEFGHIJ");
+            const float spaced = fonts::textWidth (fonts::label (10.0f, 0.2f), "ABCDEFGHIJ");
+            logMessage ("10 letras a 10 px: " + juce::String (plain, 1) + " px, con .2 em: " + juce::String (spaced, 1) + " px");
+            expectWithinAbsoluteError (spaced - plain, 20.0f, 2.5f);
+        }
+
+        beginTest ("el movimiento no depende de los cuadros por segundo");
+        {
+            anim::Spring a, b;
+            for (int i = 0; i < 30; ++i) a.step (1.0f, 1.0f / 60.0f, 2.1f, 0.78f);
+            for (int i = 0; i < 72; ++i) b.step (1.0f, 1.0f / 144.0f, 2.1f, 0.78f);
+            expectWithinAbsoluteError (a.pos, b.pos, 0.01f);
+
+            float x = 0.0f, y = 0.0f;
+            for (int i = 0; i < 6; ++i)  x = anim::approach (x, 1.0f, 1.0f / 60.0f, 0.05f);
+            for (int i = 0; i < 14; ++i) y = anim::approach (y, 1.0f, 1.0f / 144.0f, 0.05f);
+            expectWithinAbsoluteError (x, y, 0.02f);
+
+            VuMeter vu60, vu144;
+            for (int i = 0; i < 60; ++i)  { vu60.push (0.25f, 0.25f);  vu60.tick (1.0f / 60.0f); }
+            for (int i = 0; i < 144; ++i) { vu144.push (0.25f, 0.25f); vu144.tick (1.0f / 144.0f); }
+            logMessage ("aguja del VU tras 1 s: " + juce::String (vu60.getNeedle(), 3) + " a 60 Hz, " + juce::String (vu144.getNeedle(), 3) + " a 144 Hz");
+            expectWithinAbsoluteError (vu60.getNeedle(), vu144.getNeedle(), 0.02f);
+
+            // cubic-bezier(.3,.7,.3,1) de la disquetera: empieza en 0, termina en 1, nunca retrocede.
+            expectWithinAbsoluteError (anim::cubicBezier (0.3f, 0.7f, 0.3f, 1.0f, 0.0f), 0.0f, 1.0e-4f);
+            expectWithinAbsoluteError (anim::cubicBezier (0.3f, 0.7f, 0.3f, 1.0f, 1.0f), 1.0f, 1.0e-4f);
+            float prev = 0.0f;
+            bool monotonic = true;
+            for (int i = 1; i <= 50; ++i)
+            {
+                const float v = anim::cubicBezier (0.3f, 0.7f, 0.3f, 1.0f, (float) i / 50.0f);
+                monotonic = monotonic && v >= prev - 1.0e-4f;
+                prev = v;
+            }
+            expect (monotonic);
+        }
+
+        beginTest ("una perilla gira hasta el sonido nuevo en .45 s con ease-out y escalonado");
+        {
+            HardwareKnob knob ("small", 11, "Test knob");
+            knob.setRange (0.0, 1.0);
+            knob.setValue (0.0, juce::dontSendNotification);
+            knob.setSize (80, 80);
+
+            auto frame = [&knob] (double t)
+            {
+                knob.tick (t);
+                juce::ignoreUnused (knob.createComponentSnapshot (knob.getLocalBounds()));
+                return knob.getShownProportion();
+            };
+
+            expectWithinAbsoluteError (frame (100.0), 0.0, 1.0e-6);
+
+            knob.setValue (1.0, juce::dontSendNotification);
+            knob.animateToCurrentValue (100.0, 0.05);
+
+            expectWithinAbsoluteError (frame (100.04), 0.0, 1.0e-6, "durante el escalonado la perilla espera");
+            const double mid = frame (100.05 + HardwareKnob::kPresetSeconds * 0.5);
+            expect (mid > 0.8 && mid < 0.95, "a mitad de camino un ease-out cubico va por 0.875: " + juce::String (mid, 3));
+            expectWithinAbsoluteError (frame (100.6), 1.0, 1.0e-6);
+        }
+
+        beginTest ("una tecla se hunde aunque el clic dure menos que un cuadro, y su LED prende con rampa");
+        {
+            juce::TextButton key ("Key");
+            key.setSize (60, 30);
+            ButtonMotion motion;
+            motion.add (key);
+
+            auto prop = [&key] (const char* id) { return (float) (double) key.getProperties()[id]; };
+            const double t0 = juce::Time::getMillisecondCounterHiRes() * 0.001;
+
+            key.setState (juce::Button::buttonDown);
+            key.setState (juce::Button::buttonNormal);
+            motion.tick (t0 + 1.0 / 60.0, 1.0f / 60.0f);
+            expect (prop ("sp92Press") > 0.5f, "el clic no se vio: " + juce::String (prop ("sp92Press")));
+
+            for (int i = 2; i < 40; ++i)
+                motion.tick (t0 + i / 60.0, 1.0f / 60.0f);
+            expectEquals (prop ("sp92Press"), 0.0f, "la tecla no volvio arriba");
+
+            key.setToggleState (true, juce::dontSendNotification);
+            motion.tick (t0 + 41.0 / 60.0, 1.0f / 60.0f);
+            const float lit = prop ("sp92LitAmt");
+            expect (lit > 0.2f && lit < 0.9f, "el LED salto en vez de prender: " + juce::String (lit));
+        }
+
+        beginTest ("la pantalla tiene la inercia de un cristal liquido");
+        {
+            DotMatrix m (8, 8);
+            m.set (2, 2);
+            m.commit (0.004f);
+            const float rising = m.getLevel (2, 2);
+            expect (rising > 0.1f && rising < 0.6f, "prende: " + juce::String (rising));
+
+            m.commit (0.05f);
+            expectEquals (m.getLevel (2, 2), 1.0f);
+
+            m.clear();
+            m.commit (1.0f / 60.0f);
+            const float falling = m.getLevel (2, 2);
+            expect (! m.isLit (2, 2));
+            expect (falling > 0.4f && falling < 0.9f, "se apaga con cola: " + juce::String (falling));
+
+            m.commit (0.3f);
+            expectEquals (m.getLevel (2, 2), 0.0f);
+        }
+    }
+};
+
+static MotionTests motionTests;
 static ChordNamingTests chordNamingTests;
 static GuiFeedTests guiFeedTests;
 static EchoModelTests echoModelTests;

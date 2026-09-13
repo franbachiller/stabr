@@ -91,6 +91,23 @@ target_sources(STABR PRIVATE
 
 target_include_directories(STABR PUBLIC Source)
 
+# ---------------------------------------------------------------------------
+# Tipografias del SP-92 (SIL OFL 1.1, ver LICENSING.md). Van embebidas en el
+# binario: la interfaz se ve igual en cualquier maquina, tenga o no las fuentes.
+# ---------------------------------------------------------------------------
+juce_add_binary_data(STABR_Fonts
+    HEADER_NAME BinaryData.h
+    NAMESPACE   BinaryData
+    SOURCES
+        Resources/Fonts/Michroma-Regular.ttf
+        Resources/Fonts/ArchivoNarrow-SemiBold.ttf
+        Resources/Fonts/ArchivoNarrow-Bold.ttf
+        Resources/Fonts/ReenieBeanie-Regular.ttf
+)
+set_target_properties(STABR_Fonts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(STABR PRIVATE STABR_Fonts)
+target_compile_definitions(STABR PRIVATE STABR_HAS_EMBEDDED_FONTS=1)
+
 target_compile_definitions(STABR PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

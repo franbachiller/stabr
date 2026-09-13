@@ -49,6 +49,8 @@ VersionInfoProductName={#AppName}
 [Files]
 Source: "..\build\STABR_artefacts\Release\VST3\STABR.vst3\*"; DestDir: "{commoncf64}\VST3\STABR.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\docs\manual\*"; DestDir: "{app}\Manual"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Las fuentes van embebidas en el plugin; la OFL exige distribuir su licencia.
+Source: "..\Resources\Fonts\OFL-*.txt"; DestDir: "{app}\Licenses"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\STABR Manual (English)"; Filename: "{app}\Manual\STABR-Manual-EN.html"

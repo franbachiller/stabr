@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "ButtonMotion.h"
 #include "ChassisLayer.h"
 #include "DotMatrix.h"
 #include "Hardware.h"
@@ -32,7 +33,7 @@ inline const juce::Identifier layoutItemProperty { "stabrLayoutItem" };
 inline const juce::Identifier paramIdProperty { "stabrParamID" };
 
 /*  El SP-92 entero, disenado a 1100 x 780. El editor lo escala con una
-    transformacion afin. Ver DECISIONS.md D-049. */
+    transformacion afin. Ver DECISIONS.md D-049 y D-050. */
 class DeviceView final : public juce::Component
 {
 public:
@@ -44,7 +45,7 @@ public:
 
     void resized() override;
 
-    /*  Llamado en cada VBlank desde el editor. */
+    /*  Llamado en cada VBlank desde el editor: el pulso de todo lo que se mueve. */
     void tick (double nowSeconds);
 
     void setFinish (int index);
@@ -66,9 +67,13 @@ public:
     DotMatrix& getLcd() noexcept { return lcd; }
     juce::String getLcdChordName() const { return shownChordName; }
 
+    /*  Retardo del giro al cargar un sonido: las perillas arrancan de
+        izquierda a derecha, como una ola. */
+    static constexpr double kStaggerSeconds = 0.07;
+
 private:
     HardwareKnob& addKnob (const char* paramID, const juce::String& silk, const juce::String& style, int ticks,
-                           float cx, float cy, float diameter, float labelGap);
+                           float cx, float cy, float diameter);
     void place (juce::Component&, int x, int y, int w, int h);
     void setupKey (juce::TextButton&, const juce::String& text, bool dark, bool led, const juce::String& title);
 
@@ -114,6 +119,7 @@ private:
     std::array<juce::TextButton, 3> modeKeys;
     VuMeter vu;
 
+    SectionHead seqHead;
     StepGrid steps;
     juce::TextButton seqKey;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> seqAttachment;
@@ -125,6 +131,9 @@ private:
     std::array<std::unique_ptr<BatSwitch>, 3> bats;
     TapeLabel tape;
 
+    // Ultimo miembro a proposito: se destruye antes que los botones que escucha.
+    ButtonMotion motion;
+
     struct Overlay
     {
         juce::String label;
@@ -134,7 +143,7 @@ private:
 
     int page = 0, subPage = 0;
     Overlay overlay;
-    double lastNow = 0.0, generateStarted = -10.0, lastOnset = -10.0;
+    double lastNow = 0.0, lastTick = 0.0, generateStarted = -10.0, lastOnset = -10.0;
     chord::ChordResult lastNotes;
     juce::String shownChordName;
 

@@ -2,21 +2,29 @@
 
 #include <juce_graphics/juce_graphics.h>
 
-/*  Tipografias del SP-92.
+/*  Tipografias del SP-92: Michroma (marca, modelo, STAB), Archivo Narrow 600 y
+    700 (serigrafia y teclas) y Reenie Beanie (lo escrito a mano). Las tres de
+    Google Fonts bajo SIL OFL 1.1, embebidas desde Resources/Fonts. Ver
+    LICENSING.md.
 
-    Las definitivas son Michroma (placa del modelo), Archivo Narrow (serigrafia)
-    y Reenie Beanie (lo escrito a mano), las tres de Google Fonts bajo SIL OFL
-    1.1, que permite embeberlas en software comercial. Si estan en
-    Assets/Fonts, CMake las embebe y define STABR_HAS_EMBEDDED_FONTS.
-
-    Sin ellas se usan equivalentes de Windows: Bahnschrift (una DIN condensada
-    que viene con Windows 10 y 11) y Segoe Print. Asi la interfaz nunca queda
-    con una fuente por defecto. Ver LICENSING.md. */
+    Los tamanos se piden como en el CSS del mockup: en px de em y con el
+    letter-spacing en em. JUCE mide la altura como ascendente + descendente y el
+    kerning como proporcion de esa altura; aca se convierte para que 11 px con
+    .16 em se vean igual que en la maqueta aprobada. */
 namespace stabr::gui::sp92::fonts
 {
-juce::Font display (float height);                   // placa del modelo, STAB
-juce::Font label (float height, bool bold = true);   // serigrafia del panel
-juce::Font hand (float height);                      // etiquetas y cinta
+juce::Font display   (float px, float trackingEm = 0.0f);   // Michroma
+juce::Font label     (float px, float trackingEm = 0.0f);   // Archivo Narrow 600
+juce::Font labelBold (float px, float trackingEm = 0.0f);   // Archivo Narrow 700
+juce::Font hand      (float px);                            // Reenie Beanie
 
 bool usingEmbeddedFonts() noexcept;
+
+/*  Ancho del texto incluido el espaciado, como lo mide un navegador. */
+float textWidth (const juce::Font&, const juce::String&);
+
+/*  Texto en una caja de line-height 1: centrado vertical en la caja, y en
+    horizontal a la izquierda, centrado o a la derecha. */
+void drawText (juce::Graphics&, const juce::String&, const juce::Font&,
+               juce::Rectangle<float> box, juce::Justification);
 }

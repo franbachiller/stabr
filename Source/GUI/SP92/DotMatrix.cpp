@@ -1,6 +1,7 @@
 #include "DotMatrix.h"
 
 #include <array>
+#include <cmath>
 #include <cstring>
 
 namespace stabr::gui::sp92
@@ -75,7 +76,9 @@ const std::uint8_t* dotGlyph (juce::juce_wchar c) noexcept
 
 //==============================================================================
 DotMatrix::DotMatrix (int dotsWide, int dotsHigh)
-    : W (dotsWide), H (dotsHigh), fb ((size_t) (dotsWide * dotsHigh), 0), shown ((size_t) (dotsWide * dotsHigh), 1)
+    : W (dotsWide), H (dotsHigh),
+      fb ((size_t) (dotsWide * dotsHigh), 0), last ((size_t) (dotsWide * dotsHigh), 2),
+      level ((size_t) (dotsWide * dotsHigh), 0.0f)
 {
     setOpaque (false);
     setInterceptsMouseClicks (false, false);
@@ -100,6 +103,11 @@ void DotMatrix::set (int x, int y) noexcept
 bool DotMatrix::isLit (int x, int y) const noexcept
 {
     return x >= 0 && y >= 0 && x < W && y < H && fb[(size_t) (y * W + x)] != 0;
+}
+
+float DotMatrix::getLevel (int x, int y) const noexcept
+{
+    return x >= 0 && y >= 0 && x < W && y < H ? level[(size_t) (y * W + x)] : 0.0f;
 }
 
 void DotMatrix::block (int x, int y, int size) noexcept
@@ -154,13 +162,40 @@ void DotMatrix::textCenter (const juce::String& s, int xCentre, int y, int scale
     text (s, xCentre - textWidth (s, scale) / 2, y, scale);
 }
 
-void DotMatrix::commit()
+void DotMatrix::commit (float dt)
 {
-    if (std::memcmp (fb.data(), shown.data(), fb.size()) != 0)
+    const bool changed = std::memcmp (fb.data(), last.data(), fb.size()) != 0;
+
+    if (! changed && ! settling)
+        return;
+
+    if (changed)
+        last = fb;
+
+    const float kOn  = 1.0f - std::exp (-juce::jmax (0.0f, dt) / kOnTau);
+    const float kOff = 1.0f - std::exp (-juce::jmax (0.0f, dt) / kOffTau);
+    bool moving = false;
+
+    for (size_t i = 0; i < fb.size(); ++i)
     {
-        shown = fb;
-        repaint();
+        const float target = fb[i] != 0 ? 1.0f : 0.0f;
+        float l = level[i];
+
+        if (l == target)
+            continue;
+
+        l += (target - l) * (target > l ? kOn : kOff);
+
+        if (std::abs (l - target) < 0.04f)
+            l = target;
+        else
+            moving = true;
+
+        level[i] = l;
     }
+
+    settling = moving;
+    repaint();
 }
 
 //==============================================================================
@@ -168,11 +203,15 @@ void DotMatrix::paint (juce::Graphics& g)
 {
     const auto b = getLocalBounds().toFloat();
 
-    // Vidrio retroiluminado: mas claro arriba al centro, como una lampara detras.
-    juce::ColourGradient glass (fin->lcdBg1, b.getCentreX(), b.getY() + b.getHeight() * 0.3f,
-                                fin->lcdBg2, b.getRight(), b.getBottom(), true);
-    g.setGradientFill (glass);
-    g.fillRoundedRectangle (b, 4.0f);
+    // Vidrio retroiluminado: radial-gradient(120% 140% at 50% 30%, bg1, bg2).
+    {
+        const juce::Point<float> c { b.getCentreX(), b.getY() + b.getHeight() * 0.3f };
+        juce::ColourGradient glass (fin->lcdBg1, c.x, c.y, fin->lcdBg2, c.x + b.getWidth() * 1.2f, c.y, true);
+        juce::FillType fill (glass);
+        fill.transform = juce::AffineTransform::scale (1.0f, (1.4f * b.getHeight()) / (1.2f * b.getWidth()), c.x, c.y);
+        g.setFillType (fill);
+        g.fillRoundedRectangle (b, 4.0f);
+    }
 
     const auto area = b.reduced (10.0f, 8.0f);
     const float px = area.getWidth() / (float) W;
@@ -203,36 +242,62 @@ void DotMatrix::paint (juce::Graphics& g)
 
     g.drawImage (unlitCache, area);
 
-    juce::RectangleList<float> lit, halo;
+    // Puntos encendidos en seis niveles de brillo (la inercia del cristal).
+    constexpr int kLevels = 6;
+    std::array<juce::RectangleList<float>, kLevels + 1> lit, halo, haze;
 
     for (int y = 0; y < H; ++y)
         for (int x = 0; x < W; ++x)
-            if (shown[(size_t) (y * W + x)])
+        {
+            const int q = juce::roundToInt (level[(size_t) (y * W + x)] * (float) kLevels);
+
+            if (q <= 0)
+                continue;
+
+            const juce::Rectangle<float> dot { area.getX() + x * px + px * 0.07f, area.getY() + y * py + py * 0.07f, px * 0.86f, py * 0.86f };
+            lit[(size_t) q].addWithoutMerging (dot);
+
+            if (fin->lcdGlows)
             {
-                const juce::Rectangle<float> dot { area.getX() + x * px + px * 0.07f, area.getY() + y * py + py * 0.07f, px * 0.86f, py * 0.86f };
-                lit.addWithoutMerging (dot);
-
-                if (fin->lcdGlows)
-                    halo.addWithoutMerging (dot.expanded (px * 0.45f, py * 0.45f));
+                halo[(size_t) q].addWithoutMerging (dot.expanded (px * 0.40f, py * 0.40f));
+                haze[(size_t) q].addWithoutMerging (dot.expanded (px * 0.95f, py * 0.95f));
             }
+        }
 
-    if (fin->lcdGlows)
+    for (int q = 1; q <= kLevels; ++q)
     {
-        g.setColour (fin->lcdGlow.withMultipliedAlpha (0.22f));
-        g.fillRectList (halo);
+        const float a = (float) q / (float) kLevels;
+
+        if (fin->lcdGlows)
+        {
+            g.setColour (fin->lcdGlow.withMultipliedAlpha (0.08f * a));
+            g.fillRectList (haze[(size_t) q]);
+            g.setColour (fin->lcdGlow.withMultipliedAlpha (0.20f * a));
+            g.fillRectList (halo[(size_t) q]);
+        }
+
+        g.setColour (fin->lcdOn.withMultipliedAlpha (a));
+        g.fillRectList (lit[(size_t) q]);
     }
 
-    g.setColour (fin->lcdOn);
-    g.fillRectList (lit);
+    // Reflejo del vidrio: linear-gradient(165deg, .18 0%, .04 34%, 0 35%), con
+    // el corte neto de un vidrio real.
+    {
+        const float ang = 165.0f * juce::MathConstants<float>::pi / 180.0f;
+        const juce::Point<float> dir { std::sin (ang), -std::cos (ang) };
+        const float len = std::abs (b.getWidth() * dir.x) + std::abs (b.getHeight() * dir.y);
+        const auto c = b.getCentre();
+        juce::ColourGradient reflection (juce::Colours::white.withAlpha (0.18f), c - dir * (len * 0.5f),
+                                         juce::Colours::white.withAlpha (0.0f), c + dir * (len * 0.5f), false);
+        reflection.addColour (0.34, juce::Colours::white.withAlpha (0.04f));
+        reflection.addColour (0.35, juce::Colours::white.withAlpha (0.0f));
+        g.setGradientFill (reflection);
+        g.fillRoundedRectangle (b, 4.0f);
+    }
 
-    // Reflejo del vidrio y sombra interna del marco.
-    juce::ColourGradient reflection (juce::Colours::white.withAlpha (0.16f), b.getX(), b.getY(),
-                                     juce::Colours::white.withAlpha (0.0f), b.getX() + b.getWidth() * 0.34f, b.getY() + b.getHeight() * 0.7f, false);
-    g.setGradientFill (reflection);
-    g.fillRoundedRectangle (b, 4.0f);
-
-    juce::ColourGradient inner (juce::Colours::black.withAlpha (0.45f), 0.0f, b.getY(),
-                                juce::Colours::black.withAlpha (0.0f), 0.0f, b.getY() + 9.0f, false);
+    // inset 0 3px 10px .55 e inset 0 0 0 1px .5.
+    juce::ColourGradient inner (juce::Colours::black.withAlpha (0.55f), 0.0f, b.getY(),
+                                juce::Colours::black.withAlpha (0.0f), 0.0f, b.getY() + 11.0f, false);
     g.setGradientFill (inner);
     g.fillRoundedRectangle (b, 4.0f);
 

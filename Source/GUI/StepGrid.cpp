@@ -1,6 +1,7 @@
 #include "StepGrid.h"
 #include "SP92/Sp92LookAndFeel.h"
 #include "SP92/Sp92Fonts.h"
+#include "SP92/ButtonMotion.h"
 #include "../Params/ParameterIDs.h"
 
 namespace stabr::gui
@@ -13,6 +14,22 @@ namespace
             && std::abs (a.velocity - b.velocity) < 1.0e-4f
             && std::abs (a.probability - b.probability) < 1.0e-4f;
     }
+
+    float lerp (float a, float b, float t) noexcept { return a + (b - a) * t; }
+
+    void insetRounded (juce::Graphics& g, juce::Rectangle<float> r, float radius, float dy, juce::Colour c)
+    {
+        juce::Path clip, crescent;
+        clip.addRoundedRectangle (r, radius);
+        crescent.addRoundedRectangle (r, radius);
+        crescent.addRoundedRectangle (r.translated (0.0f, dy), radius);
+        crescent.setUsingNonZeroWinding (false);
+
+        juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (clip);
+        g.setColour (c);
+        g.fillPath (crescent);
+    }
 }
 
 //==============================================================================
@@ -22,6 +39,8 @@ public:
     Cell (StepGrid& o, int i) : owner (o), index (i)
     {
         setWantsKeyboardFocus (true);
+        setPaintingIsUnclipped (true);
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
         setTitle ("Step " + juce::String (i + 1));
 
         const auto n = (size_t) i;
@@ -35,111 +54,122 @@ public:
         if (sameStep (s, step) && isInLength == inLength && isPlaying == playing)
             return;
 
-        const bool contentChanged = ! sameStep (s, step);
+        if (! sameStep (s, step))
+            setDescription (! s.on ? juce::String ("Off")
+                                   : "On, velocity " + juce::String (juce::roundToInt (s.velocity * 100.0f))
+                                         + "%, probability " + juce::String (juce::roundToInt (s.probability * 100.0f))
+                                         + "%, ratchet " + (s.ratchet > 1 ? "x" + juce::String (s.ratchet) : juce::String ("off")));
+
         step = s;
         inLength = isInLength;
         playing = isPlaying;
+        repaint();
+    }
 
-        if (contentChanged)
+    void animate (float dt)
+    {
+        const float onTarget   = step.on ? 1.0f : 0.0f;
+        const float headTarget = playing ? 1.0f : 0.0f;
+        const float ledTarget  = step.on ? 0.55f + 0.45f * juce::jlimit (0.0f, 1.0f, step.velocity) : 0.0f;
+        const float pressTarget = isMouseButtonDown() ? 1.0f : 0.0f;
+        const float fadeTarget = inLength ? 1.0f : 0.4f;
+
+        if (dt < 0.0f)
         {
-            setDescription (! step.on ? juce::String ("Off")
-                                      : "On, velocity " + juce::String (juce::roundToInt (step.velocity * 100.0f))
-                                            + "%, probability " + juce::String (juce::roundToInt (step.probability * 100.0f))
-                                            + "%, ratchet " + (step.ratchet > 1 ? "x" + juce::String (step.ratchet) : juce::String ("off")));
+            onAmt = onTarget; head = headTarget; led = ledTarget; press = pressTarget; fade = fadeTarget;
+            repaint();
+            return;
         }
 
-        repaint();
+        const float o = sp92::anim::approach (onAmt, onTarget, dt, 0.04f);
+        const float h = sp92::anim::approach (head, headTarget, dt, 0.017f, 0.075f);
+        const float l = sp92::anim::approach (led, ledTarget, dt, 0.03f, 0.07f);
+        const float p = sp92::anim::approach (press, pressTarget, dt, 0.017f, 0.04f);
+        const float f = sp92::anim::approach (fade, fadeTarget, dt, 0.06f);
+
+        if (o != onAmt || h != head || l != led || p != press || f != fade)
+        {
+            onAmt = o; head = h; led = l; press = p; fade = f;
+            sp92::repaintWithMargin (*this, 16);
+        }
     }
 
     void paint (juce::Graphics& g) override
     {
-        const auto& f = sp92::currentFinish (*this);
+        const auto& fin = sp92::currentFinish (*this);
         const float size = (float) StepGrid::kPadSize;
-        const bool down = playing || isMouseButtonDown();
-        const auto face = juce::Rectangle<float> (0.0f, down ? 3.0f : 0.0f, size, size);
+        const float sink = 3.0f * head + 1.5f * press * (1.0f - head);
+        const auto face = juce::Rectangle<float> (0.0f, sink, size, size);
+        constexpr float radius = 9.0f;
 
-        if (! inLength)
-            g.beginTransparencyLayer (0.4f);
+        if (fade < 0.999f)
+            g.beginTransparencyLayer (fade);
 
-        if (! down)
+        // box-shadow: 0 6px 10px .25, 0 4px 0 .35; encendido: aro de 2 px y brillo
+        // de 16 px; sonando: aro pleno y brillo de 24 px.
+        sp92::anim::blurredRoundedRect (g, face, radius, fin.led.withAlpha (0.60f * head), 24.0f);
+        sp92::anim::blurredRoundedRect (g, face, radius, fin.led.withAlpha (0.35f * onAmt * (1.0f - head)), 16.0f);
+        sp92::anim::blurredRoundedRect (g, face.translated (0.0f, 6.0f), radius, juce::Colours::black.withAlpha (0.25f * (1.0f - head)), 10.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillRoundedRectangle (face.translated (0.0f, lerp (4.0f, 1.0f, head)), radius);
+
+        const float ring = juce::jmax (0.55f * onAmt, head);
+        if (ring > 0.001f)
         {
-            g.setColour (juce::Colours::black.withAlpha (0.15f));
-            g.fillRoundedRectangle (face.translated (0.0f, 6.0f).expanded (1.0f), 10.0f);
-            g.setColour (juce::Colours::black.withAlpha (0.35f));
-            g.fillRoundedRectangle (face.translated (0.0f, 4.0f), 9.0f);
+            g.setColour (fin.led.withAlpha (ring));
+            g.fillRoundedRectangle (face.expanded (2.0f), radius + 2.0f);
         }
 
-        if (step.on || playing)
+        // Goma: linear-gradient(160deg, hi, pad 55%, lo).
         {
-            const float glow = playing ? 0.6f : 0.35f * (0.4f + 0.6f * step.velocity);
-            g.setColour (f.led.withAlpha (glow * 0.5f));
-            g.fillRoundedRectangle (face.expanded (5.0f), 13.0f);
+            const float a = 160.0f * juce::MathConstants<float>::pi / 180.0f;
+            const juce::Point<float> dir { std::sin (a), -std::cos (a) };
+            const float len = std::abs (size * dir.x) + std::abs (size * dir.y);
+            const auto c = face.getCentre();
+            juce::ColourGradient rubber (fin.padHi, c - dir * (len * 0.5f), fin.padLo, c + dir * (len * 0.5f), false);
+            rubber.addColour (0.55, fin.pad);
+            g.setGradientFill (rubber);
+            g.fillRoundedRectangle (face, radius);
         }
 
-        juce::ColourGradient rubber (f.padHi, face.getX(), face.getY(), f.padLo, face.getRight(), face.getBottom(), false);
-        rubber.addColour (0.55, f.pad);
-        g.setGradientFill (rubber);
-        g.fillRoundedRectangle (face, 9.0f);
+        insetRounded (g, face, radius, 1.0f, juce::Colours::white.withAlpha (lerp (0.16f, 0.12f, head)));
 
-        juce::ColourGradient shade (juce::Colours::transparentBlack, 0.0f, face.getCentreY(),
-                                    juce::Colours::black.withAlpha (0.35f), 0.0f, face.getBottom(), false);
-        g.setGradientFill (shade);
-        g.fillRoundedRectangle (face, 9.0f);
+        for (int k = 0; k < 5; ++k)
+            insetRounded (g, face, radius, -(lerp (3.0f, 2.0f, head) + lerp (6.0f, 4.0f, head) * ((float) k / 4.0f - 0.5f)),
+                          juce::Colours::black.withAlpha (lerp (0.45f, 0.40f, head) * 1.2f / 5.0f));
 
-        g.setColour (juce::Colours::white.withAlpha (0.16f));
-        g.drawLine (face.getX() + 9.0f, face.getY() + 1.0f, face.getRight() - 9.0f, face.getY() + 1.0f, 1.0f);
+        // LED del paso.
+        const juce::Rectangle<float> ledRect { size - 14.0f, face.getY() + 7.0f, 7.0f, 7.0f };
+        sp92::anim::ledGlow (g, ledRect, fin.led, led, 8.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f).interpolatedWith (fin.led, led));
+        g.fillEllipse (ledRect);
 
-        if (step.on || playing)
-        {
-            g.setColour (f.led.withAlpha (playing ? 1.0f : 0.55f));
-            g.drawRoundedRectangle (face.expanded (1.0f), 10.0f, 2.0f);
-        }
-
-        // LED del paso: brillo segun la velocity.
-        const juce::Rectangle<float> led { face.getRight() - 14.0f, face.getY() + 7.0f, 7.0f, 7.0f };
-
-        if (step.on)
-        {
-            const float brightness = 0.35f + 0.65f * juce::jlimit (0.0f, 1.0f, step.velocity);
-            g.setColour (f.led.withAlpha (0.4f * brightness));
-            g.fillEllipse (led.expanded (3.0f));
-            g.setColour (f.led.withAlpha (brightness));
-        }
-        else
-        {
-            g.setColour (juce::Colours::black.withAlpha (0.35f));
-        }
-
-        g.fillEllipse (led);
-
-        g.setFont (sp92::fonts::label (9.0f));
         g.setColour (juce::Colours::white.withAlpha (0.28f));
-        g.drawText (juce::String (index + 1), juce::Rectangle<float> (face.getX() + 6.0f, face.getBottom() - 15.0f, 20.0f, 12.0f),
-                    juce::Justification::centredLeft, false);
+        sp92::fonts::drawText (g, juce::String (index + 1), sp92::fonts::label (9.0f, 0.08f),
+                               { 7.0f, face.getBottom() - 15.0f, 24.0f, 9.0f }, juce::Justification::centredLeft);
 
         if (step.on && step.probability < 0.999f)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.55f));
-            g.drawText (juce::String (juce::roundToInt (step.probability * 100.0f)),
-                        juce::Rectangle<float> (face.getRight() - 28.0f, face.getBottom() - 15.0f, 22.0f, 12.0f),
-                        juce::Justification::centredRight, false);
+            g.setColour (juce::Colours::white.withAlpha (0.5f));
+            sp92::fonts::drawText (g, juce::String (juce::roundToInt (step.probability * 100.0f)), sp92::fonts::label (9.0f, 0.04f),
+                                   { size - 30.0f, face.getBottom() - 15.0f, 23.0f, 9.0f }, juce::Justification::centredRight);
         }
 
         if (step.on && step.ratchet > 1)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.6f));
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
 
             for (int k = 0; k < step.ratchet; ++k)
-                g.fillEllipse (face.getX() + 7.0f + (float) k * 6.0f, face.getY() + 8.0f, 3.5f, 3.5f);
+                g.fillEllipse (7.0f + (float) k * 6.0f, face.getY() + 8.5f, 3.5f, 3.5f);
         }
 
-        if (! inLength)
+        if (fade < 0.999f)
             g.endTransparencyLayer();
 
         if (hasKeyboardFocus (false))
         {
-            g.setColour (f.stripInk.withAlpha (0.9f));
-            g.drawRoundedRectangle (face.expanded (3.0f), 11.0f, 1.2f);
+            g.setColour (fin.led);
+            g.drawRoundedRectangle (face.expanded (4.0f), radius + 4.0f, 2.0f);
         }
     }
 
@@ -159,7 +189,6 @@ public:
             owner.toggleStep (index);
 
         dragStartVelocity = owner.getDisplayedStep (index).velocity;
-        repaint();
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -180,8 +209,6 @@ public:
     {
         if (! e.mods.isPopupMenu() && turnOffOnRelease && ! dragged)
             owner.toggleStep (index);
-
-        repaint();
     }
 
     bool keyPressed (const juce::KeyPress& key) override
@@ -214,8 +241,8 @@ public:
         return false;
     }
 
-    void focusGained (FocusChangeType) override { repaint(); }
-    void focusLost (FocusChangeType) override   { repaint(); }
+    void focusGained (FocusChangeType) override { sp92::repaintWithMargin (*this, 8); }
+    void focusLost (FocusChangeType) override   { sp92::repaintWithMargin (*this, 8); }
 
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override
     {
@@ -260,6 +287,8 @@ private:
     seq::Step step { true, -1.0f, -1.0f, 0 };   // invalido a proposito: fuerza el primer refresh
     bool inLength = true;
     bool playing = false;
+
+    float onAmt = 0.0f, head = 0.0f, led = 0.0f, press = 0.0f, fade = 1.0f;
 
     float dragStartVelocity = 0.8f;
     bool dragged = false;
@@ -317,12 +346,16 @@ seq::Step StepGrid::getDisplayedStep (int index) const
     return s;
 }
 
-void StepGrid::tick (int playingStep)
+void StepGrid::tick (int playingStep, float dt)
 {
     const int length = getLength();
 
     for (int i = 0; i < seq::kNumSteps; ++i)
-        cells[(size_t) i]->refresh (getDisplayedStep (i), i < length, i == playingStep);
+    {
+        auto& cell = *cells[(size_t) i];
+        cell.refresh (getDisplayedStep (i), i < length, i == playingStep);
+        cell.animate (dt);
+    }
 }
 
 //==============================================================================
