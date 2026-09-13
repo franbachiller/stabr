@@ -8,6 +8,8 @@
 #include "Chord/NoteRouter.h"
 #include "Params/ParamCache.h"
 #include "FX/FxChain.h"
+#include "Sequencer/StepSequencer.h"
+#include "Sequencer/NoteLatch.h"
 
 namespace stabr
 {
@@ -49,13 +51,28 @@ public:
     chord::ChordResult getSoundingNotes() const noexcept { return voices.getSoundingNotes(); }
     fx::FxChain& getFxChain() noexcept { return fxChain; }
 
+    /*  Paso del secuenciador sonando ahora (-1 = parado). Es un atomico: la GUI
+        lo puede leer directo. */
+    int getSequencerStep() const noexcept { return sequencer.getCurrentStep(); }
+
     /*  Solo para tests y mediciones: no llamar desde la GUI sin un FIFO. */
     int getActiveVoiceCount() const noexcept { return voices.getActiveVoiceCount(); }
     int getOscillatorCount()  const noexcept { return voices.getOscillatorCount(); }
 
+    /*  Disparo del secuenciador para el motor de voces. No es una nota MIDI
+        (esas van de 0 a 127), asi que soltar una tecla nunca puede apagar el
+        acorde que dispara el secuenciador, ni al reves. */
+    static constexpr int kSequencerTrigger = 1000;
+
+    /*  Octava de la fundamental cuando el secuenciador no tiene nada latcheado:
+        la tonica de la tonalidad en la octava 3 (La -> A3, nota 57). */
+    static constexpr int kFallbackRootBase = 48;
+
 private:
     void timerCallback() override;
-    void applyEvent (const NoteRouter::Event&) noexcept;
+    void applyEvent (const NoteRouter::Event&, bool sequencerRunning) noexcept;
+    void applySequencerEvent (const seq::StepSequencer::Event&) noexcept;
+    void triggerSequencedChord (float velocity) noexcept;
     void updateParametersForBlock() noexcept;
 
     juce::AudioProcessorValueTreeState apvts;
@@ -69,6 +86,13 @@ private:
     NoteRouter::EventList events;
     chord::ChordParams chordParams;
     VoiceParams voiceParams;
+
+    seq::StepSequencer sequencer;
+    seq::SeqParams seqParams;
+    seq::StepSequencer::EventList sequencerEvents;
+    seq::NoteLatch latch;
+    seq::Transport transport;
+    bool sequencerWasRunning = false;
 
     SilenceGate silenceGate;
     juce::SmoothedValue<float> masterGainSmoothed;

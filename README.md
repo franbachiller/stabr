@@ -13,13 +13,36 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 4 completa y verificada.** Ya es un instrumento de club: delay
-sincronizado al host con tres modos, reverb FDN propia, chorus BBD, saturación,
-pump sincronizado y etapa de salida con graves en mono.
+**Fase 5 completa y verificada.** El stab toca solo: secuenciador de 16 pasos
+alineado al transporte del host, con swing, ratchets, probabilidad por paso,
+cuatro patrones de fábrica y latch.
 
-Build limpio sin warnings, 2.166.441 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.226.589 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
-buffer (32 a 2048), con 93 parámetros.
+buffer (32 a 2048), con 163 parámetros.
+
+### El secuenciador
+
+Encendé **Seq On**, apretá play en el DAW y el stab suena en el contratiempo,
+sin mandar una sola nota MIDI: dispara el acorde de la tónica de la tonalidad.
+Tocá una tecla y soltala — el patrón pasa a disparar **ese** acorde y lo sigue
+haciendo (latch). Con el transporte parado, las teclas tocan en vivo.
+
+- **16 pasos** con on/off, velocity, probabilidad y ratchet (×2, ×3) por paso.
+  Largo de 1 a 16 (polimetría) y resolución de 1/32 a 1/4, con tresillos.
+- **Swing** de 50 % (recto) a 75 %, y gate por paso.
+- **Patrones de fábrica:** off-beat de corcheas, 3+3+2, skippy de semicorcheas
+  y sparse techno. Son de solo lectura y se pueden automatizar desde el DAW;
+  `Custom` usa los 16 pasos editables.
+- **Sin reloj propio:** cada disparo se calcula desde la posición del host.
+  Arranca alineado aunque le des play a mitad de compás, se realinea en cada
+  loop, y el render offline es idéntico al de tiempo real. La probabilidad
+  también es determinística. Detalle en [D-039](DECISIONS.md).
+
+Medido en el plugin entero, sin MIDI, 120 BPM a 48 kHz: los ocho stabs de dos
+compases arrancan en las muestras 12012, 36012, 60012… — el grid exacto más
+**12 muestras fijas** (0,25 ms, el retardo del camino de audio), idénticas en
+los ocho.
 
 ### El motor de acordes
 
@@ -125,7 +148,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 | 2 | Motor de acordes: escalas, voicings, inversiones, passthrough | **completa** |
 | 3 | Carácter: osciladores, unísono, filtro SVF, drive | **completa** |
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | **completa** |
-| 5 | Secuenciador: gate rítmico, swing, sync al host | — |
+| 5 | Secuenciador: gate rítmico, swing, sync al host | **completa** |
 | 6 | Identidad visual: GUI completa con visualizadores | — |
 | 7 | Presets, pulido, distribución | — |
 
@@ -227,7 +250,8 @@ Source/
   Common/               utilidades compartidas (silencio, versionado de estado)
   Chord/                generador de acordes, escalas y ruteo de notas
   FX/                   delay, reverb, chorus, saturacion, pump, salida
-  Sequencer/ GUI/       fases 5 y 6
+  Sequencer/            secuenciador de pasos, patrones de fabrica, latch
+  GUI/                  fase 6
 Tests/                  tests headless
 Scripts/                build, validación y el .bat de instalación
 cmake/                  JUCE pinneada, flags de warnings

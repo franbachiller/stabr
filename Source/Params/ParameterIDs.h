@@ -13,6 +13,8 @@
     debe llevar el hint de ESA version, no el de la 1.
 */
 
+#include <array>
+
 namespace stabr::pid
 {
     // Version del layout de parametros. Los parametros nuevos que se agreguen
@@ -136,21 +138,52 @@ namespace stabr::pid
     inline constexpr auto pitchBendRange  = "pitch_bend_range";
     inline constexpr auto hqMode          = "hq_mode";
 
+    // --- Secuenciador (Fase 5) ------------------------------------------------
+    inline constexpr auto seqEnabled = "seq_enabled";
+    inline constexpr auto seqPattern = "seq_pattern";
+    inline constexpr auto seqRate    = "seq_rate";
+    inline constexpr auto seqSteps   = "seq_steps";
+    inline constexpr auto seqSwing   = "seq_swing";
+    inline constexpr auto seqGate    = "seq_gate";
+
+    /*  Los 16 pasos editables, escritos a mano y no generados con un bucle: un
+        ID tiene que poder encontrarse con un grep, y nadie deberia poder
+        cambiarlo tocando una cadena de formato. */
+    inline constexpr std::array<const char*, 16> seqStepOn
+    {
+        "seq_step_on_00", "seq_step_on_01", "seq_step_on_02", "seq_step_on_03",
+        "seq_step_on_04", "seq_step_on_05", "seq_step_on_06", "seq_step_on_07",
+        "seq_step_on_08", "seq_step_on_09", "seq_step_on_10", "seq_step_on_11",
+        "seq_step_on_12", "seq_step_on_13", "seq_step_on_14", "seq_step_on_15"
+    };
+
+    inline constexpr std::array<const char*, 16> seqStepVelocity
+    {
+        "seq_step_vel_00", "seq_step_vel_01", "seq_step_vel_02", "seq_step_vel_03",
+        "seq_step_vel_04", "seq_step_vel_05", "seq_step_vel_06", "seq_step_vel_07",
+        "seq_step_vel_08", "seq_step_vel_09", "seq_step_vel_10", "seq_step_vel_11",
+        "seq_step_vel_12", "seq_step_vel_13", "seq_step_vel_14", "seq_step_vel_15"
+    };
+
+    inline constexpr std::array<const char*, 16> seqStepProbability
+    {
+        "seq_step_prob_00", "seq_step_prob_01", "seq_step_prob_02", "seq_step_prob_03",
+        "seq_step_prob_04", "seq_step_prob_05", "seq_step_prob_06", "seq_step_prob_07",
+        "seq_step_prob_08", "seq_step_prob_09", "seq_step_prob_10", "seq_step_prob_11",
+        "seq_step_prob_12", "seq_step_prob_13", "seq_step_prob_14", "seq_step_prob_15"
+    };
+
+    inline constexpr std::array<const char*, 16> seqStepRatchet
+    {
+        "seq_step_ratchet_00", "seq_step_ratchet_01", "seq_step_ratchet_02", "seq_step_ratchet_03",
+        "seq_step_ratchet_04", "seq_step_ratchet_05", "seq_step_ratchet_06", "seq_step_ratchet_07",
+        "seq_step_ratchet_08", "seq_step_ratchet_09", "seq_step_ratchet_10", "seq_step_ratchet_11",
+        "seq_step_ratchet_12", "seq_step_ratchet_13", "seq_step_ratchet_14", "seq_step_ratchet_15"
+    };
+
     /*  Espacio de nombres reservado para fases siguientes. Se declara aca para
         que nadie invente un ID incompatible mas adelante:
 
-        Fase 3 (caracter): osc1_wave, osc2_wave, osc2_level, osc2_detune,
-                           osc2_octave, sub_level, sub_wave, uni_count,
-                           uni_detune, uni_width, uni_phase_mode,
-                           filt_cutoff, filt_reso, filt_type, filt_slope,
-                           filt_env_amount, filt_key_track, filt_vel_amount,
-                           fenv_attack..fenv_release, drive_amount, drive_type
-        Fase 4 (fx):       sat_*, chorus_*, delay_*, reverb_*, pump_*,
-                           width_*, mono_freq, limiter_*
-        Fase 5 (seq):      seq_enabled, seq_steps, seq_swing, seq_rate,
-                           seq_gate, seq_pattern, seq_step_on_00..15,
-                           seq_step_vel_00..15, seq_step_prob_00..15,
-                           seq_step_ratchet_00..15
         Fase 6 (gui):      no son parametros: van en el ValueTree de estado
                            (ui_scale, ui_page, ui_theme)
     */

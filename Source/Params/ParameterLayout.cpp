@@ -8,6 +8,7 @@
 #include "../DSP/Oscillators/Oscillator.h"
 #include "../DSP/Filters/SvfTpt.h"
 #include "../FX/FxChain.h"
+#include "../Sequencer/Patterns.h"
 
 namespace stabr
 {
@@ -583,6 +584,67 @@ APVTS::ParameterLayout createParameterLayout()
 
     layout.add (std::make_unique<juce::AudioParameterBool> (
         makeID (pid::hqMode), "HQ Mode", false));
+
+    //==========================================================================
+    // SECUENCIADOR
+    //==========================================================================
+    /*  Apagado por defecto: un instrumento que arranca a tocar solo cuando se
+        aprieta play, sin que nadie le haya mandado MIDI, es una sorpresa. */
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        makeID (pid::seqEnabled), "Seq On", false));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::seqPattern), "Seq Pattern",
+        toStringArray (seq::patternNames), (int) seq::PatternId::offbeat8));
+
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        makeID (pid::seqRate), "Seq Rate",
+        toStringArray (seq::rateNames), (int) seq::StepRate::n1_16));
+
+    layout.add (std::make_unique<DiscreteIntParameter> (
+        makeID (pid::seqSteps), "Seq Length", 1, seq::kNumSteps, seq::kNumSteps,
+        juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
+            [] (int v, int) { return juce::String (v) + (v == 1 ? " paso" : " pasos"); })));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::seqSwing), "Swing",
+        juce::NormalisableRange<float> { 0.5f, 0.75f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        makeID (pid::seqGate), "Seq Gate",
+        juce::NormalisableRange<float> { 0.05f, 1.0f }, 0.5f,
+        juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+    /*  Los pasos editables arrancan con el contratiempo de corcheas, sacado de
+        la tabla de fabrica: pasar a 'Custom' por primera vez no deja un patron
+        vacio, y los defaults no pueden desincronizarse de la tabla. */
+    const auto& startingPattern = seq::factoryPattern (seq::PatternId::offbeat8);
+
+    for (size_t i = 0; i < (size_t) seq::kNumSteps; ++i)
+    {
+        const auto n = juce::String ((int) i + 1).paddedLeft ('0', 2);
+        const auto& s = startingPattern[i];
+
+        layout.add (std::make_unique<juce::AudioParameterBool> (
+            makeID (pid::seqStepOn[i]), "Step " + n + " On", s.on));
+
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            makeID (pid::seqStepVelocity[i]), "Step " + n + " Vel",
+            juce::NormalisableRange<float> { 0.0f, 1.0f }, s.on ? s.velocity : 0.8f,
+            juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            makeID (pid::seqStepProbability[i]), "Step " + n + " Prob",
+            juce::NormalisableRange<float> { 0.0f, 1.0f }, s.probability,
+            juce::AudioParameterFloatAttributes{}.withStringFromValueFunction (percentText)));
+
+        layout.add (std::make_unique<DiscreteIntParameter> (
+            makeID (pid::seqStepRatchet[i]), "Step " + n + " Ratchet", 1, seq::kMaxRatchet, s.ratchet,
+            juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
+                [] (int v, int) { return v <= 1 ? juce::String ("Off")
+                                                : juce::String ("x") + juce::String (v); })));
+    }
 
     return layout;
 }

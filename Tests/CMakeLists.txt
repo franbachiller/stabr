@@ -18,6 +18,7 @@ add_executable(STABR_Tests
     test_router.cpp
     test_character.cpp
     test_fx.cpp
+    test_sequencer.cpp
 )
 
 target_link_libraries(STABR_Tests PRIVATE

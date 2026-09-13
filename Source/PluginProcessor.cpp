@@ -28,6 +28,9 @@ void StabrProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     router.prepare (sampleRate);
     fxChain.prepare (sampleRate, samplesPerBlock);
     silenceGate.prepare (sampleRate);
+    sequencer.prepare (sampleRate);
+    latch.reset();
+    sequencerWasRunning = false;
 
     masterGainSmoothed.reset (sampleRate, 0.02);
     masterGainSmoothed.setCurrentAndTargetValue (
@@ -46,6 +49,9 @@ void StabrProcessor::reset()
     router.reset();
     fxChain.reset();
     silenceGate.reset();
+    sequencer.reset();
+    latch.reset();
+    sequencerWasRunning = false;
     currentBendNormalised = 0.0f;
 }
 
@@ -96,10 +102,10 @@ void StabrProcessor::updateParametersForBlock() noexcept
 
     /*  Tempo y posicion del host.
 
-        El delay, la reverb y el pump se sincronizan a esto. Si el host no
-        informa tempo (algunos no lo hacen fuera del transporte), se usa el
-        ultimo valido: quedarse en 0 haria que todas las divisiones dieran
-        infinito. */
+        El delay, la reverb, el pump y el secuenciador se sincronizan a esto.
+        Si el host no informa tempo (algunos no lo hacen fuera del transporte),
+        se usa el ultimo valido: quedarse en 0 haria que todas las divisiones
+        dieran infinito. */
     double bpm = lastKnownBpm;
     double ppq = 0.0;
     bool playing = false;
@@ -125,42 +131,75 @@ void StabrProcessor::updateParametersForBlock() noexcept
 
     lastKnownBpm = bpm;
 
+    transport.bpm         = bpm;
+    transport.ppq         = ppq;
+    transport.isPlaying   = playing;
+    transport.hasPosition = positionValid;
+
+    p.fillSeqParams (seqParams);
+    sequencer.setParams (seqParams);
+
+    /*  Con latencia declarada (modo Auto) el host adelanta la salida del
+        plugin. Todo lo que se alinea al transporte tiene que generarse esa
+        misma cantidad mas tarde, o el pump caeria 20 ms antes del bombo. */
+    const double latencyBeats = (double) router.getLatencySamples() * (bpm / 60.0)
+                              / juce::jmax (1.0, getSampleRate());
+
     p.fillFxParams (fxParams);
     fxChain.setParams (fxParams, bpm);
-    fxChain.setTransport (ppq, bpm, playing, positionValid);
+    fxChain.setTransport (ppq - latencyBeats, bpm, playing, positionValid);
 
     masterGainSmoothed.setTargetValue (
         juce::Decibels::decibelsToGain (p.masterGain->load(), -60.0f));
 }
 
 //==============================================================================
-void StabrProcessor::applyEvent (const NoteRouter::Event& e) noexcept
+void StabrProcessor::applyEvent (const NoteRouter::Event& e, bool sequencerRunning) noexcept
 {
     using Type = NoteRouter::Event::Type;
 
     switch (e.type)
     {
         case Type::chordOn:
+        case Type::noteOn:
         {
-            // UNA TECLA -> UN ACORDE. La interaccion central del plugin.
-            const auto notes = chord::generateChord (e.note, chordParams);
-            voices.noteOnChord (e.note, notes, e.velocity);
+            // Toda tecla se latchea, suene o no: lo que se toca con el
+            // transporte parado es lo que el secuenciador dispara al arrancar.
+            latch.noteOn (e.note, e.velocity);
+
+            /*  Con el secuenciador andando, la tecla ELIGE el acorde pero no
+                lo dispara: el disparo es del patron. Si sonaran las dos cosas,
+                cada tecla meteria un stab fuera de tiempo. Ver D-017. */
+            if (sequencerRunning)
+                break;
+
+            if (e.type == Type::chordOn)
+            {
+                // UNA TECLA -> UN ACORDE. La interaccion central del plugin.
+                const auto notes = chord::generateChord (e.note, chordParams);
+                voices.noteOnChord (e.note, notes, e.velocity);
+            }
+            else
+            {
+                voices.noteOnSingle (e.note, e.velocity);
+            }
             break;
         }
 
-        case Type::noteOn:
-            voices.noteOnSingle (e.note, e.velocity);
-            break;
-
         case Type::noteOff:
-            voices.noteOff (e.note);
+            latch.noteOff (e.note);
+
+            if (! sequencerRunning)
+                voices.noteOff (e.note);
             break;
 
         case Type::allNotesOff:
+            latch.releaseAllHeld();
             voices.allNotesOff (true);
             break;
 
         case Type::allSoundOff:
+            latch.releaseAllHeld();
             voices.allNotesOff (false);
             break;
 
@@ -170,6 +209,44 @@ void StabrProcessor::applyEvent (const NoteRouter::Event& e) noexcept
             voices.setParams (voiceParams);
             break;
     }
+}
+
+void StabrProcessor::applySequencerEvent (const seq::StepSequencer::Event& e) noexcept
+{
+    if (e.type == seq::StepSequencer::Event::Type::gateOn)
+        triggerSequencedChord (e.velocity);
+    else
+        voices.noteOff (kSequencerTrigger);
+}
+
+void StabrProcessor::triggerSequencedChord (float velocity) noexcept
+{
+    /*  QUE dispara el secuenciador (D-017):
+
+        - Sin nada latcheado: el acorde de la tonica de la tonalidad. El plugin
+          suena apenas se enciende el secuenciador y se aprieta play, sin MIDI.
+        - Chord: el acorde generado desde la ultima tecla.
+        - Passthrough: las notas latcheadas tal cual (el acorde tocado a mano).
+        - Auto: la misma regla que en vivo, una tecla genera y varias pasan.
+
+        Todo entra al motor de voces como UN disparo con el mismo trigger: el
+        acorde anterior se suelta solo y el robo sigue siendo por acorde. */
+    if (latch.isEmpty())
+    {
+        const int root = kFallbackRootBase + chordParams.keyRoot;
+        voices.noteOnChord (kSequencerTrigger, chord::generateChord (root, chordParams), velocity);
+        return;
+    }
+
+    const auto mode = router.getNoteMode();
+    const bool literal = mode == chord::NoteMode::passthrough
+                      || (mode == chord::NoteMode::autoDetect && latch.size() > 1);
+
+    if (literal)
+        voices.noteOnChord (kSequencerTrigger, latch.getLatchedNotes(), velocity);
+    else
+        voices.noteOnChord (kSequencerTrigger,
+                            chord::generateChord (latch.getLastNote(), chordParams), velocity);
 }
 
 //==============================================================================
@@ -190,14 +267,38 @@ void StabrProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     // los eventos ya listos, con su posicion exacta dentro del bloque.
     router.process (midiMessages, numSamples, events);
 
-    // Render por sub-bloques entre eventos: sin esto, un stab disparado a mitad
-    // de bloque suena cuantizado al tamano del buffer. Ver DECISIONS.md D-008.
-    int startSample = 0;
+    // El secuenciador emite sus gates con la misma precision de muestra.
+    sequencer.process (transport, numSamples, router.getLatencySamples(), sequencerEvents);
 
-    for (int i = 0; i < events.count; ++i)
+    const bool sequencerRunning = sequencer.isRunning();
+
+    // Al arrancar, lo que se estaba tocando en vivo se suelta: si no, un
+    // acorde mantenido con el transporte parado seguiria sonando encima del
+    // patron hasta que se soltara la tecla.
+    if (sequencerRunning && ! sequencerWasRunning)
+        voices.allNotesOff (true);
+
+    sequencerWasRunning = sequencerRunning;
+
+    /*  Render por sub-bloques entre eventos: sin esto, un stab disparado a
+        mitad de bloque suena cuantizado al tamano del buffer. Ver D-008.
+
+        Las dos listas (MIDI y secuenciador) ya vienen ordenadas y se mezclan
+        en orden temporal. A igual muestra va primero el MIDI: una tecla
+        apretada justo en un paso tiene que cambiar el acorde de ESE paso. */
+    int startSample = 0;
+    int midiIndex = 0;
+    int seqIndex = 0;
+
+    while (midiIndex < events.count || seqIndex < sequencerEvents.count)
     {
-        const auto& e = events[i];
-        const int eventPos = juce::jlimit (startSample, numSamples, e.offset);
+        const bool takeMidi = seqIndex >= sequencerEvents.count
+                           || (midiIndex < events.count
+                               && events[midiIndex].offset <= sequencerEvents[seqIndex].offset);
+
+        const int offset = takeMidi ? events[midiIndex].offset
+                                    : sequencerEvents[seqIndex].offset;
+        const int eventPos = juce::jlimit (startSample, numSamples, offset);
 
         if (eventPos > startSample)
         {
@@ -205,7 +306,10 @@ void StabrProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             startSample = eventPos;
         }
 
-        applyEvent (e);
+        if (takeMidi)
+            applyEvent (events[midiIndex++], sequencerRunning);
+        else
+            applySequencerEvent (sequencerEvents[seqIndex++]);
     }
 
     if (startSample < numSamples)
@@ -302,6 +406,11 @@ void StabrProcessor::setStateInformation (const void* data, int sizeInBytes)
         return;
 
     state::migrate (tree);
+
+    /*  Los parametros que un proyecto viejo no trae (los del secuenciador en un
+        proyecto de la v0.4) quedan en su DEFAULT, no en el valor que tuviera la
+        instancia: JUCE crea el nodo que falta y al agregarlo le aplica el
+        default. Hay un test que lo verifica. Ver DECISIONS.md D-040. */
     apvts.replaceState (tree);
 }
 }

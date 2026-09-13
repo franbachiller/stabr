@@ -338,7 +338,7 @@ Confirmadas con el usuario, se implementan en la fase que corresponde:
 | ~~D-014~~ | ~~3~~ | **Implementada, con dos correcciones que aparecieron al medir.** (1) El presupuesto es un techo **blando**, no duro: nunca se dejan acordes incompletos, así que el mínimo de 1 unísono por voz puede pasarlo (256 de presupuesto, 322 osciladores medidos en el peor caso). (2) **No controla el costo del drive**, que escala con VOCES y no con osciladores: subir el unísono de 1 a 7 sube de 11,1 % a 14,0 %, mientras que encender el drive salta a 41,2 %. La palanca para el drive es la polifonía, no el unísono. El presupuesto arranca en 256, no en 128: con 128 se quedaba corto para un acorde de 7 notas con unísono 7. |
 | ~~D-015~~ | ~~4~~ | **Implementada y verificada.** Línea propia con Lagrange-3 y puntero deslizante. El impulso sale en la muestra **exacta** (480, 6000, 18000, 48000 medidas) y la interpolación distorsiona **−240 dB** con retardo fraccionario. Los dos modos de cambio de tiempo funcionan: `Tape` desliza (glissando) y `Digital` salta con crossfade. |
 | ~~D-016~~ | ~~4~~ | **Implementada y verificada.** FDN 8×8 Hadamard con difusor Dattorro al frente. Las tres mitigaciones del flutter están puestas (largos primos entre sí, modulación independiente por línea, damping por realimentación) y **no hizo falta el plan B**: los tres modos quedan estables con decay y size al máximo (pico 0,900, sin divergencia en 15 s), el decay controla la cola de 0,43 a 5,18 s, y la salida es estéreo de verdad. |
-| D-017 | 5 | **El secuenciador latchea:** apretás una tecla, la soltás, y sigue disparando ese acorde. Si no hay nada apretado, cae a la fundamental de la tonalidad. Sin esto no se cumple la promesa de sacar un stab en 30 segundos. |
+| ~~D-017~~ | ~~5~~ | **Implementada y verificada.** Latch con la regla de una mano en el teclado: las teclas apretadas juntas se suman, la primera después de soltar todo empieza un acorde nuevo. Sin nada latcheado suena el acorde de la tónica en la octava 3. Con el patrón andando la tecla elige el acorde pero no lo dispara; con el transporte parado toca en vivo. Detalle en D-039. |
 
 ---
 
@@ -659,3 +659,126 @@ reverb, el pump y la etapa de salida quedan fijos al final.
   las colas**. Si fuera antes, la reverb seguiría sonando durante el bombo y el
   efecto no se notaría — que es justamente lo que se quiere evitar.
 - La **salida** (ancho, graves en mono, limitador) es por definición lo último.
+
+---
+
+## D-039 · Fase 5 · El secuenciador no tiene reloj: es una función de la posición del host
+
+**Decisión:** cada disparo se calcula a partir de la posición en negras que
+informa el host. El paso N empieza en `N × largoDelPaso` (más el swing si N es
+impar), sin contador interno de muestras.
+
+**Motivo:** un reloj propio que avanza muestra a muestra se desfasa del host, y
+hay que resincronizarlo al arrancar, al hacer loop y al hacer click en la regla.
+Calculado desde la posición, **cumple el brief solo**: arranca en el lugar
+correcto aunque el transporte empiece a mitad de compás, y se realinea en
+cuanto el host salta.
+
+Los bloques son intervalos semiabiertos `[inicio, fin)` contiguos, y cada
+disparo cae en exactamente uno. Si el bloque empieza donde terminó el anterior
+(con 10 ms de tolerancia para el redondeo del host), se usa la posición
+*esperada* y no la informada: así un disparo justo en el borde no se duplica ni
+se pierde. Si la diferencia es mayor, es un salto: se cierra la nota abierta y
+se sigue desde la posición nueva.
+
+**Verificado:** con bloques de 1, 32, 128, 511, 2048 y tamaños aleatorios, un
+patrón con swing, ratchets, probabilidad y un tempo de 128,37 BPM da
+**exactamente la misma lista de eventos**. Un render offline es idéntico al de
+tiempo real.
+
+Tres detalles que salen de esto:
+
+- **La probabilidad es determinística.** La tirada es un hash (splitmix64) del
+  índice absoluto del paso. Cambia en cada vuelta del patrón, pero el mismo
+  compás del tema da siempre el mismo resultado. Con `juce::Random` el render
+  offline sonaría distinto del que se escuchó (el mismo problema que D-036).
+- **Sin playhead corre libre.** El Standalone de JUCE en Windows no tiene
+  transporte: el secuenciador arranca desde el paso 1 al encenderse.
+- **El patrón se alinea al comienzo del tema, no al compás.** Con 16 pasos a
+  1/16 un patrón es un compás de 4/4; con largos distintos (polimetría) sigue
+  contando desde la negra 0.
+
+### Patrones de fábrica de solo lectura
+
+**Decisión:** `seq_pattern` elige entre `Custom` (los 16 pasos editables) y
+cuatro tablas fijas. Elegir una tabla **no sobrescribe** los pasos editables.
+
+**Alternativa descartada:** que elegir un patrón copie sus valores a los
+parámetros `seq_step_*`. Obligaría a escribir parámetros desde un listener —
+que el host puede llamar desde el hilo de audio — y cambiar de patrón
+destruiría lo que el usuario editó. Así el patrón se puede **automatizar** en el
+DAW para cambiar de ritmo en vivo. En la Fase 6 la GUI ofrece "editar este
+patrón", que copia la tabla a `Custom` desde el hilo de mensajes.
+
+### Qué dispara y qué hace la tecla
+
+- El secuenciador sabe **cuándo**; el procesador decide **qué**. Sin nada
+  latcheado, suena el acorde de la tónica en la octava 3 (La → A3). En `Chord`
+  se genera desde la última tecla; en `Passthrough` se secuencian las notas
+  latcheadas tal cual; en `Auto` rige la misma regla que en vivo.
+- **Con el patrón andando, la tecla elige el acorde pero no lo dispara.** Si
+  sonaran las dos cosas, cada tecla metería un stab fuera de tiempo. Con el
+  transporte parado las teclas tocan en vivo, y lo que se toca queda latcheado
+  para cuando arranque.
+- Las teclas apretadas juntas **se suman** (acorde armado a mano); la primera
+  tecla después de soltar todo empieza uno nuevo.
+- **El all-notes-off del host no borra el latch.** Muchos DAWs lo mandan al
+  parar el transporte; borrarlo haría el latch inservible.
+- El disparo del secuenciador usa un trigger que no es una nota MIDI (1000):
+  soltar una tecla nunca puede apagar el acorde del patrón.
+
+---
+
+## D-040 · Fase 5 · Un proyecto viejo carga los parámetros nuevos en su default (y un diagnóstico mío que estaba mal)
+
+**Riesgo:** un proyecto guardado con la v0.4 no tiene ningún parámetro `seq_*`.
+Si al cargarlo esos parámetros se quedaran con el valor que tuviera la
+instancia, abrir un proyecto viejo en una instancia con el secuenciador
+encendido lo dejaría encendido, y el proyecto empezaría a tocar solo.
+
+**Lo que JUCE hace de verdad:** los pone en su default. No hace falta código
+propio, y **no se sube `stateVersion`**: agregar parámetros no cambia el
+significado de los que ya estaban. La versión queda para migraciones
+semánticas.
+
+**El test** prende el secuenciador, carga un estado sin parámetros `seq_*` y
+verifica que vuelvan a su default, y que un parámetro que sí estaba en el
+estado se siga cargando. Queda como guardia: si una versión futura de JUCE
+cambia este comportamiento, falla.
+
+### El diagnóstico equivocado
+
+Queda escrito porque es el mismo tipo de error que D-032, y es fácil de repetir.
+
+Leyendo `updateParameterConnectionsToChildTrees` concluí que JUCE **no**
+aplicaba el default: `setNewState` sólo se llama para los hijos que el estado
+trae, y para los que faltan se crea un nodo vacío con `appendChild`. Escribí un
+arreglo que completaba el árbol antes de cargarlo, y el test pasó.
+
+Pero **un test que nunca se vio fallar no prueba nada** (D-024). Al romper el
+arreglo a propósito, el test **siguió pasando**. Primero verifiqué que el build
+hubiera recompilado de verdad (lo había hecho). La explicación estaba en lo que
+no leí: `appendChild` dispara el listener `valueTreeChildAdded` del APVTS, que
+llama a `setNewState`, que lee la propiedad `value` **con el default como
+valor de respaldo**.
+
+El arreglo era redundante y se sacó. Leer el código no alcanza cuando hay
+listeners de por medio: hay que medir.
+
+---
+
+## D-041 · Fase 5 · Lo que se alinea al transporte descuenta la latencia declarada
+
+**Decisión:** el secuenciador y el pump reciben la posición del host **menos**
+la latencia que el plugin declara.
+
+**Motivo:** en modo `Auto` el plugin declara 20 ms y el host adelanta su salida
+esa cantidad para compensarla. Las notas MIDI llegan demoradas por la ventana
+de detección, así que quedan en tiempo. Pero todo lo que se genera desde la
+posición del transporte **no** pasa por esa ventana: sin descontar la latencia,
+el secuenciador y el pump sonaban **20 ms antes** del bombo.
+
+El bug del pump ya existía en la Fase 4 y no se veía porque ningún test
+combinaba modo `Auto` con el transporte. Salió al diseñar el secuenciador,
+pensando qué pasaba con sus disparos en ese modo. Hay un test que verifica que
+con 960 muestras de latencia el primer disparo cae en 12000 + 960.

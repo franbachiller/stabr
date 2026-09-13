@@ -6,6 +6,7 @@
 #include "../DSP/VoiceParams.h"
 #include "../Chord/ChordGenerator.h"
 #include "../FX/FxChain.h"
+#include "../Sequencer/StepSequencer.h"
 
 namespace stabr
 {
@@ -137,6 +138,41 @@ struct ParamCache
         outputMonoBelow = get (pid::outputMonoBelow);
         outputLimiter   = get (pid::outputLimiter);
         outputGain      = get (pid::outputGain);
+
+        seqEnabled = get (pid::seqEnabled);
+        seqPattern = get (pid::seqPattern);
+        seqRate    = get (pid::seqRate);
+        seqSteps   = get (pid::seqSteps);
+        seqSwing   = get (pid::seqSwing);
+        seqGate    = get (pid::seqGate);
+
+        for (size_t i = 0; i < (size_t) seq::kNumSteps; ++i)
+        {
+            seqStepOn[i]          = get (pid::seqStepOn[i]);
+            seqStepVelocity[i]    = get (pid::seqStepVelocity[i]);
+            seqStepProbability[i] = get (pid::seqStepProbability[i]);
+            seqStepRatchet[i]     = get (pid::seqStepRatchet[i]);
+        }
+    }
+
+    //==========================================================================
+    void fillSeqParams (seq::SeqParams& s) const noexcept
+    {
+        s.enabled = seqEnabled->load() > 0.5f;
+        s.pattern = (seq::PatternId) (int) seqPattern->load();
+        s.rate    = (seq::StepRate)  (int) seqRate->load();
+        s.length  = (int) seqSteps->load();
+        s.swing   = seqSwing->load();
+        s.gate    = seqGate->load();
+
+        for (size_t i = 0; i < (size_t) seq::kNumSteps; ++i)
+        {
+            auto& step = s.custom[i];
+            step.on          = seqStepOn[i]->load() > 0.5f;
+            step.velocity    = seqStepVelocity[i]->load();
+            step.probability = seqStepProbability[i]->load();
+            step.ratchet     = (int) seqStepRatchet[i]->load();
+        }
     }
 
     //==========================================================================
@@ -366,5 +402,21 @@ struct ParamCache
     std::atomic<float>* outputMonoBelow = nullptr;
     std::atomic<float>* outputLimiter = nullptr;
     std::atomic<float>* outputGain = nullptr;
+
+    std::atomic<float>* seqEnabled = nullptr;
+    std::atomic<float>* seqPattern = nullptr;
+    std::atomic<float>* seqRate = nullptr;
+    std::atomic<float>* seqSteps = nullptr;
+    std::atomic<float>* seqSwing = nullptr;
+    std::atomic<float>* seqGate = nullptr;
+
+    using StepPointers = std::array<std::atomic<float>*, (size_t) seq::kNumSteps>;
+    StepPointers seqStepOn {};
+    StepPointers seqStepVelocity {};
+    StepPointers seqStepProbability {};
+    StepPointers seqStepRatchet {};
 };
+
+// Si alguien cambia la cantidad de pasos, las tablas de IDs tienen que crecer.
+static_assert (pid::seqStepOn.size() == (size_t) seq::kNumSteps);
 }
