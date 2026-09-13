@@ -13,7 +13,7 @@ namespace
 {
     constexpr int kMargin = 10;
     constexpr int kGap = 8;
-    constexpr int kHeaderHeight = 52;
+    constexpr int kHeaderHeight = 56;
     constexpr int kHeroHeight = 272;
     constexpr int kTabHeight = 30;
     constexpr int kSeqHeight = 100;
@@ -30,6 +30,7 @@ namespace
 //==============================================================================
 MainView::MainView (StabrProcessor& p)
     : proc (p), apvts (p.getAPVTS()),
+      presetBar (p.getPresetManager()),
       chordPanel ("Chord"), tonePanel ("Filter / Amp"), delayPanel ("Delay"),
       stepGrid (p.getAPVTS())
 {
@@ -46,14 +47,11 @@ MainView::MainView (StabrProcessor& p)
     header.addAndMakeVisible (logo);
 
     subtitle.setText (utf8 ("by Narfbach") + separator + "v" + JucePlugin_VersionString, juce::dontSendNotification);
-    subtitle.setFont (fonts::label (12.0f));
+    subtitle.setFont (fonts::label (11.0f));
     subtitle.setColour (juce::Label::textColourId, colours::textMuted);
     header.addAndMakeVisible (subtitle);
 
-    status.setFont (fonts::value (12.0f));
-    status.setJustificationType (juce::Justification::centred);
-    status.setColour (juce::Label::textColourId, colours::textMuted);
-    header.addAndMakeVisible (status);
+    header.addAndMakeVisible (presetBar);
 
     sizeBox.setTitle ("Interface size");
     int id = 1;
@@ -82,12 +80,12 @@ MainView::MainView (StabrProcessor& p)
     scaleMode = control (chordPanel, { pid::scaleMode, "Scale",      ControlSize::medium });
     chordPanel.addAndMakeVisible (chordViz);
 
-    cutoff    = control (tonePanel, { pid::filterCutoff,    "Cutoff",    ControlSize::large });
-    resonance = control (tonePanel, { pid::filterResonance, "Resonance", ControlSize::large });
-    ampDecay  = control (tonePanel, { pid::ampDecay,        "Decay",     ControlSize::large });
+    cutoff    = control (tonePanel, { pid::filterCutoff,    "Cutoff",     ControlSize::large });
+    resonance = control (tonePanel, { pid::filterResonance, "Resonance",  ControlSize::large });
+    ampDecay  = control (tonePanel, { pid::ampDecay,        "Decay",      ControlSize::large });
     envAmount = control (tonePanel, { pid::filterEnvAmount, "Env Amount", ControlSize::medium });
-    envDecay  = control (tonePanel, { pid::filtEnvDecay,    "Env Decay", ControlSize::medium });
-    drive     = control (tonePanel, { pid::driveAmount,     "Drive",     ControlSize::medium });
+    envDecay  = control (tonePanel, { pid::filtEnvDecay,    "Env Decay",  ControlSize::medium });
+    drive     = control (tonePanel, { pid::driveAmount,     "Drive",      ControlSize::medium });
 
     delayPanel.addAndMakeVisible (delayViz);
     delayTime     = control (delayPanel, { pid::delayDivision, "Time",     ControlSize::small });
@@ -124,7 +122,6 @@ MainView::MainView (StabrProcessor& p)
     seqPanel.addAndMakeVisible (stepGrid);
 
     showPage (0);
-    refreshStatus();
     refreshChordDetail();
     refreshDelayInfo();
 }
@@ -276,17 +273,22 @@ void MainView::resized()
         page->setBounds (area);
 
     //--------------------------------------------------------------------------
-    // Cabecera
+    // Cabecera: logo y version apilados, sonidos, tamano y medidor
     //--------------------------------------------------------------------------
     {
-        juce::FlexBox fb;
-        fb.alignItems = juce::FlexBox::AlignItems::center;
-        fb.items.add (juce::FlexItem (logo).withWidth (100.0f).withHeight (32.0f));
-        fb.items.add (juce::FlexItem (subtitle).withWidth (190.0f).withHeight (20.0f));
-        fb.items.add (juce::FlexItem (status).withFlex (1.0f).withHeight (20.0f));
-        fb.items.add (juce::FlexItem (sizeBox).withWidth (84.0f).withHeight (26.0f).withMargin (juce::FlexItem::Margin (0.0f, 12.0f, 0.0f, 0.0f)));
-        fb.items.add (juce::FlexItem (meter).withWidth (150.0f).withHeight (22.0f));
-        fb.performLayout (header.getContentBounds());
+        auto h = header.getContentBounds();
+
+        auto logoColumn = h.removeFromLeft (110);
+        logo.setBounds (logoColumn.removeFromTop (26));
+        subtitle.setBounds (logoColumn);
+
+        h.removeFromLeft (kGap);
+        meter.setBounds (h.removeFromRight (90).withSizeKeepingCentre (90, 22));
+        h.removeFromRight (10);
+        sizeBox.setBounds (h.removeFromRight (84).withSizeKeepingCentre (84, 26));
+        h.removeFromRight (kGap);
+
+        presetBar.setBounds (h);
     }
 
     //--------------------------------------------------------------------------
@@ -393,6 +395,8 @@ void MainView::tick (double now)
         }
     }
 
+    presetBar.tick();
+
     refreshChordDetail();
     chordViz.tick (now);
 
@@ -409,8 +413,6 @@ void MainView::tick (double now)
     const bool sync = raw (pid::delaySync) > 0.5f;
     if (delayTime->isEnabled() != sync)
         delayTime->setEnabled (sync);
-
-    refreshStatus();
 }
 
 void MainView::refreshChordDetail()
@@ -460,23 +462,5 @@ void MainView::refreshDelayInfo()
     }
 
     delayViz.setInfo (info, delayCaption);
-}
-
-void MainView::refreshStatus()
-{
-    const std::array<int, 3> key { (int) raw (pid::scaleKey), (int) raw (pid::scaleMode),
-                                   juce::roundToInt (proc.getGuiFeed().bpm.load (std::memory_order_relaxed)) };
-
-    if (key == statusKey)
-        return;
-
-    statusKey = key;
-
-    const auto root = (size_t) juce::jlimit (0, 11, key[0]);
-    const auto mode = (size_t) juce::jlimit (0, (int) chord::ScaleMode::numModes - 1, key[1]);
-
-    status.setText (juce::String (chord::keyNames[root]) + " " + chord::scaleModeNames[mode]
-                        + separator + juce::String (key[2]) + " BPM",
-                    juce::dontSendNotification);
 }
 }

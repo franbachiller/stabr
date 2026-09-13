@@ -11,6 +11,7 @@
 #include "Sequencer/StepSequencer.h"
 #include "Sequencer/NoteLatch.h"
 #include "Common/GuiFeed.h"
+#include "Presets/PresetManager.h"
 
 namespace stabr
 {
@@ -56,6 +57,9 @@ public:
         lo puede leer directo. */
     int getSequencerStep() const noexcept { return sequencer.getCurrentStep(); }
 
+    /*  Presets y Create STAB. Solo desde el hilo de mensajes. */
+    presets::PresetManager& getPresetManager() noexcept { return presetManager; }
+
     /*  Canal lock-free hacia la GUI: eventos de disparo y tiempos del delay. */
     GuiFeed& getGuiFeed() noexcept { return guiFeed; }
 
@@ -93,6 +97,7 @@ private:
     std::atomic<float> uiScale { 1.0f };
 
     juce::AudioProcessorValueTreeState apvts;
+    presets::PresetManager presetManager { apvts };
 
     ParamCache p;
 

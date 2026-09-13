@@ -870,3 +870,127 @@ preparar el plugin, cuando el delay en modo cinta todavía deslizaba desde 0
 (19,5 ms en vez de 375 ms). Se diagnosticó imprimiendo los tiempos reales que
 recibía el visualizador, no leyendo el código, y lo que se corrigió fue el
 test.
+
+---
+
+## D-045 · Fase 7 · Un preset es un sonido, no una sesión
+
+**Decisión:** cargar un preset (de fábrica, de usuario o generado) nunca toca
+**Key, Scale, Scale Lock, Note Mode, Polyphony, Bend, HQ Mode ni Master**.
+Todo lo demás queda en el valor del preset o, si el preset no lo menciona, en
+su **default**, nunca en el valor anterior.
+
+**Motivo:** la tonalidad y la escala son del tema. Un navegador de presets que
+cambia la tonalidad obliga a volver a ajustarla en cada preset, y en un stab
+armónico eso es inaceptable. Y lo no mencionado va al default porque, si
+quedara el valor anterior, un preset sonaría distinto según desde qué preset se
+llegue a él.
+
+**Decisión relacionada: el host no ve los presets como programas.**
+`getNumPrograms()` sigue en 1. Exponer los 20 como programas es tentador, pero
+hay hosts que llaman `setCurrentProgram (0)` al abrir un proyecto, y eso pisaría
+el sonido guardado con el preset 1. El navegador propio no tiene ese riesgo.
+Es un riesgo conocido de hosts, no medido en este proyecto: si alguna vez se
+quiere exponerlos, primero hay que probarlo en cada DAW objetivo.
+
+---
+
+## D-046 · Fase 7 · Todos los presets golpean al mismo volumen, medido
+
+**Decisión:** cada preset de fábrica lleva una ganancia de salida calibrada
+para que su golpe quede en **−18 dB**, medido como el RMS máximo en ventanas de
+100 ms del primer medio segundo, con un estímulo fijo (acorde sobre La3,
+250 ms). El test vuelve a medir los 20 y falla si alguno se corre más de 2 dB.
+
+**Motivo:** sin calibrar, el volumen iba de −14,6 a −29,9 dB. Pasar de un
+preset a otro engaña al oído: lo más fuerte siempre parece mejor.
+
+**Dos mediciones equivocadas antes de la buena**, las dos con el mismo patrón
+que D-032 (el instrumento de medición estaba mal, no el sonido):
+
+1. **El golpe como RMS de 300 ms** castigaba a los sonidos cortos: Minimal Blip
+   (70 ms) daba −30 dB con el mismo pico que un acorde largo, y calibrarlo lo
+   habría mandado contra el limitador. Con el máximo en ventanas de 100 ms, las
+   ganancias calibradas quedaron entre −11,6 y +7,2 dB, todas dentro del rango.
+2. **Los graves en estéreo con un pasabajos de un polo en 150 Hz**, medidos
+   como cociente contra el central, dieron 8 presets "con graves en estéreo"
+   (hasta 1,07). Un polo deja pasar el estéreo del unísono, el chorus y la
+   reverb de varios cientos de Hz, y el cociente de dos números diminutos no
+   significa nada. Con 4 polos en 100 Hz y el lateral relativo al golpe en dB,
+   **los 20 pasan con margen** (el peor, −35,5 dB contra un umbral de −24).
+
+---
+
+## D-047 · Fase 7 · Create STAB: sortear con criterio, verificar con datos
+
+**Decisión:** Create STAB elige primero un **arquetipo** (organ, deep, dub,
+rave, pluck, acid, lo-fi, atmos, brass), sortea cada parámetro dentro de
+rangos que tienen sentido para ese arquetipo, aplica reglas de correlación
+(filtro cerrado → más envolvente, resonancia alta → menos drive, feedback alto
+→ lazo más oscuro, unísono ancho → menos chorus) y **renderiza el candidato
+antes de aceptarlo**: tiene que sonar, no saturar, no dejar una cola que
+embarre, mantener los graves en mono, quedar al volumen objetivo (normalizado
+con la ganancia de *salida*, para no cambiar cuánto empujan la saturación y el
+delay) y no parecerse a ningún preset ni a ningún sonido ya generado.
+
+La tonalidad, la escala y el encendido del secuenciador nunca cambian. Los
+candados conservan el acorde, los efectos o el secuenciador. Hay deshacer y
+rehacer. Es determinístico por semilla.
+
+### En qué hilo se renderiza
+
+El análisis usa un `StabrProcessor` dedicado. **Se crea y se destruye en el
+hilo de mensajes**, y el hilo de fondo sólo lo usa para renderizar. Motivo,
+verificado en `juce_Timer.cpp`: el APVTS arranca un `Timer`, y `callTimers`
+**suelta el lock mientras ejecuta el callback**. Destruir ese procesador en un
+hilo de fondo podía hacerlo justo mientras su callback corría en el hilo de
+mensajes. Además se crea recién la primera vez que se aprieta el botón:
+crearlo en el constructor sería una recursión infinita, porque cada procesador
+crearía el suyo.
+
+### Dos problemas que encontraron los datos
+
+**Sesgo de arquetipos.** Con semillas consecutivas, 20 de 40 stabs salían
+"Organ" y ninguno "Atmos". `juce::Random` es un congruencial lineal: con
+semillas cercanas, la **primera** tirada sale casi igual, y la primera tirada
+elige el arquetipo. La semilla ahora pasa por splitmix64. En uso real las
+semillas vienen del reloj, pero el sesgo habría estado igual para dos clics
+seguidos.
+
+**Rechazos por parecido.** Con un contador de rechazos por motivo, el
+diagnóstico fue inequívoco: **87 de 87** intentos descartados lo fueron por
+parecerse a algo ya generado, **ninguno por calidad**. Se renderizaban más de
+100 ms para después tirar el resultado. Ahora la unicidad se verifica **antes**
+del render (se sortean hasta 32 candidatos, que es casi gratis, con la
+distancia calculada sobre vectores precalculados), y se sumó variación dentro
+de cada arquetipo (inversión, voicing, pre-delay, damping, wow, offset).
+
+| 40 generaciones | antes | después |
+|---|---:|---:|
+| aceptadas | 39 | **40** |
+| candidatos renderizados por stab | 3,15 | **1,02** |
+| tiempo por stab | 351 ms | **100 ms** |
+| rechazos por parecido | 87 | 1 |
+
+---
+
+## D-048 · Fase 7 · Producto en inglés, manual bilingüe, instalador Inno Setup
+
+**Decisión del usuario:** el producto va **completamente en inglés** y el
+manual en **inglés y español**. Se tradujeron los últimos textos de valor que
+quedaban en español ("4 voces" → "4 voices", "16 pasos" → "16 steps"…). Los IDs
+de parámetro no cambiaron, así que ningún proyecto guardado se rompe.
+
+**Manual en HTML**, no en Markdown ni PDF: se abre con doble clic en cualquier
+navegador, lleva la captura real de la interfaz (generada por el test de la GUI)
+y el instalador le pone acceso directo en el menú Inicio.
+
+**Instalador con Inno Setup 6:** gratuito, con uso comercial permitido, y el
+estándar de hecho para plugins en Windows. `Scripts/package.ps1` lee la versión
+del `CMakeLists.txt` (una sola fuente de verdad) y se la pasa al script. El
+`AppId` es fijo y no se cambia nunca: si cambiara, Windows trataría cada versión
+como un programa distinto. El desinstalador no borra los presets de usuario.
+
+**Pendiente:** firmar el instalador y el plugin con un certificado de código.
+Sin firma, SmartScreen muestra una advertencia al instalar. Está en el
+checklist de LICENSING.md.

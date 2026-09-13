@@ -53,7 +53,7 @@ namespace
     juce::String semitoneText (float v, int)
     {
         const auto n = juce::roundToInt (v);
-        return juce::String (n) + (std::abs (n) == 1 ? " semitono" : " semitonos");
+        return juce::String (n) + (std::abs (n) == 1 ? " semitone" : " semitones");
     }
 
     juce::String centsText (float v, int)
@@ -205,7 +205,7 @@ APVTS::ParameterLayout createParameterLayout()
         makeID (pid::unisonCount), "Unison", 1, Voice::kMaxUnison, 1,
         juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
             [] (int v, int) { return v == 1 ? juce::String ("Off")
-                                            : juce::String (v) + " voces"; })));
+                                            : juce::String (v) + " voices"; })));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         makeID (pid::unisonDetune), "Unison Detune",
@@ -315,7 +315,7 @@ APVTS::ParameterLayout createParameterLayout()
         makeID (pid::chordDensity), "Density",
         chord::kMinDensity, chord::kMaxDensity, 4,
         juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
-            [] (int v, int) { return juce::String (v) + " voces"; })));
+            [] (int v, int) { return juce::String (v) + " voices"; })));
 
     layout.add (std::make_unique<juce::AudioParameterBool> (
         makeID (pid::chordOctaveDouble), "Octave Down", false));
@@ -575,7 +575,7 @@ APVTS::ParameterLayout createParameterLayout()
     layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::polyphony), "Polyphony", 1, VoiceManager::kMaxPolyphony, 6,
         juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
-            [] (int v, int) { return juce::String (v) + (v == 1 ? " acorde" : " acordes"); })));
+            [] (int v, int) { return juce::String (v) + (v == 1 ? " chord" : " chords"); })));
 
     layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::pitchBendRange), "Pitch Bend Range", 0, 24, 2,
@@ -604,7 +604,7 @@ APVTS::ParameterLayout createParameterLayout()
     layout.add (std::make_unique<DiscreteIntParameter> (
         makeID (pid::seqSteps), "Seq Length", 1, seq::kNumSteps, seq::kNumSteps,
         juce::AudioParameterIntAttributes{}.withStringFromValueFunction (
-            [] (int v, int) { return juce::String (v) + (v == 1 ? " paso" : " pasos"); })));
+            [] (int v, int) { return juce::String (v) + (v == 1 ? " step" : " steps"); })));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
         makeID (pid::seqSwing), "Swing",

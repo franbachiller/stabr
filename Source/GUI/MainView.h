@@ -11,6 +11,7 @@
 #include "DelayVisualizer.h"
 #include "StepGrid.h"
 #include "OutputMeter.h"
+#include "PresetBar.h"
 
 namespace stabr
 {
@@ -24,8 +25,8 @@ namespace stabr::gui
     el layout no tiene que saber nada de escalas.
 
     JERARQUIA (brief, seccion 7): lo que mas se toca va arriba y grande, siempre
-    a la vista: acorde y tonalidad, cutoff / resonancia / decay, el delay, y el
-    secuenciador. Lo demas, en pestanas.
+    a la vista: sonidos y Create STAB, acorde y tonalidad, cutoff / resonancia
+    / decay, el delay, y el secuenciador. Lo demas, en pestanas.
 */
 class MainView final : public juce::Component
 {
@@ -60,14 +61,14 @@ private:
     void buildPages();
     void refreshChordDetail();
     void refreshDelayInfo();
-    void refreshStatus();
 
     StabrProcessor& proc;
     APVTS& apvts;
 
     // Cabecera
     Panel header;
-    juce::Label logo, subtitle, status;
+    juce::Label logo, subtitle;
+    PresetBar presetBar;
     juce::ComboBox sizeBox;
     OutputMeter meter;
 
@@ -92,7 +93,6 @@ private:
     std::array<int, 3> chordDetailKey { -1, -1, -1 };
     std::array<int, 8> delayCaptionKey { -1, -1, -1, -1, -1, -1, -1, -1 };
     juce::String delayCaption;
-    std::array<int, 3> statusKey { -1, -1, -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainView)
 };

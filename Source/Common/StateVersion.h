@@ -23,6 +23,9 @@ namespace state
         ni le importa al host, pero se guarda con el proyecto. */
     inline const juce::Identifier uiScaleProperty { "ui_scale" };
 
+    /*  Nombre del sonido cargado, para mostrarlo al reabrir el proyecto. */
+    inline const juce::Identifier presetNameProperty { "preset_name" };
+
     /*  Se llama en el hilo de mensajes, nunca en audio. Puede asignar memoria. */
     inline void migrate (juce::ValueTree& tree)
     {

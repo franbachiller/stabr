@@ -47,7 +47,7 @@ namespace naming_detail
     /*  De mas notas a menos: ante una igualdad exacta gana la primera, pero
         como se exige que coincidan TODAS las clases de altura, el orden solo
         importa entre calidades que comparten mascara (ninguna). */
-    inline constexpr std::array<Quality, 19> qualities
+    inline constexpr std::array<Quality, 21> qualities
     {{
         { maskOf ({ 0, 3, 7, 10, 2, 5 }), "m11",     true  },
         { maskOf ({ 0, 4, 7, 11, 2 }),    "maj9",    true  },
@@ -68,6 +68,13 @@ namespace naming_detail
         { maskOf ({ 0, 2, 7 }),           "sus2",    false },
         { maskOf ({ 0, 5, 7 }),           "sus4",    false },
         { maskOf ({ 0, 7 }),              "5",       false },
+
+        /*  Diadas con tercera: con Density 2 un acorde queda en fundamental +
+            tercera. Sin estas entradas se mostraban las notas sueltas ("E G").
+            Se prueban con el bajo como fundamental, asi que E-G es Em(no5) y
+            no el G6 sin quinta ni fundamental que tambien seria. */
+        { maskOf ({ 0, 3 }),              "m(no5)",  false },
+        { maskOf ({ 0, 4 }),              "(no5)",   false },
     }};
 
     constexpr int rotate (int mask, int root) noexcept

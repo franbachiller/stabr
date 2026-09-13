@@ -130,6 +130,24 @@ public:
             logMessage ("acordes nombrados: " + juce::String (checked));
         }
 
+        beginTest ("Density 2 nombra la diada en vez de mostrar notas sueltas");
+        {
+            // El caso de la captura del usuario: Min9, Density 2, F# frigio, tecla E.
+            auto p = literalParams (chord::ChordType::min9);
+            p.lock = chord::ScaleLock::diatonic;
+            p.keyRoot = 6;
+            p.mode = chord::ScaleMode::phrygian;
+            p.density = 2;
+
+            const auto notes = chord::generateChord (64, p);
+            expectEquals (notes.count, 2);
+            expectEquals (fullName (notes), juce::String ("Em(no5)"));
+
+            p.lock = chord::ScaleLock::off;
+            p.type = chord::ChordType::maj9;
+            expectEquals (fullName (chord::generateChord (60, p)), juce::String ("C(no5)"));
+        }
+
         beginTest ("una nota sola no inventa un acorde");
         {
             chord::ChordResult single;
@@ -338,6 +356,7 @@ bool isLayoutItem (juce::Component& c)
 {
     return c.getProperties().contains (gui::paramIdProperty)
         || c.getProperties().contains (gui::stepParamIdsProperty)
+        || c.getProperties().contains (gui::layoutItemProperty)
         || dynamic_cast<gui::Panel*> (&c) != nullptr;
 }
 
@@ -458,7 +477,10 @@ public:
                 if (c.getTitle().isEmpty())
                     problems.add ("sin nombre accesible: " + c.getName());
 
-                if (! c.getWantsKeyboardFocus())
+                // Solo los habilitados: JUCE saca del foco a lo deshabilitado
+                // (getWantsKeyboardFocus da false), y esta bien que asi sea. Un
+                // Undo sin historial no tiene por que recibir el Tab.
+                if (c.isEnabled() && ! c.getWantsKeyboardFocus())
                     problems.add ("no alcanzable con teclado: " + c.getTitle());
             });
 
@@ -467,7 +489,8 @@ public:
                 selector de tamano. Si aparece o desaparece un control, se nota. */
             const int stepParams = 4 * seq::kNumSteps;
             const int expectedInteractive = (proc.getParameters().size() - stepParams)
-                                          + seq::kNumSteps + editor->getView().getNumPages() + 1;
+                                          + seq::kNumSteps + editor->getView().getNumPages() + 1
+                                          + gui::PresetBar::kNumControls;
 
             logMessage ("controles interactivos: " + juce::String (interactive));
             expectEquals (interactive, expectedInteractive);

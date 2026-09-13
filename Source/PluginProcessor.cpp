@@ -429,6 +429,7 @@ void StabrProcessor::getStateInformation (juce::MemoryBlock& destData)
     auto tree = apvts.copyState();
     tree.setProperty (state::versionProperty, state::kCurrentVersion, nullptr);
     tree.setProperty (state::uiScaleProperty, getUiScale(), nullptr);
+    tree.setProperty (state::presetNameProperty, presetManager.getCurrentPresetName(), nullptr);
 
     if (auto xml = tree.createXml())
         copyXmlToBinary (*xml, destData);
@@ -450,6 +451,9 @@ void StabrProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     if (tree.hasProperty (state::uiScaleProperty))
         setUiScale ((float) (double) tree.getProperty (state::uiScaleProperty));
+
+    if (tree.hasProperty (state::presetNameProperty))
+        presetManager.setCurrentPresetName (tree.getProperty (state::presetNameProperty).toString());
 
     /*  Los parametros que un proyecto viejo no trae (los del secuenciador en un
         proyecto de la v0.4) quedan en su DEFAULT, no en el valor que tuviera la

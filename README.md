@@ -13,10 +13,11 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 6 completa y verificada.** STABR tiene cara propia: interfaz vectorial,
-escalable de 0,75× a 2×, con visualizador de acorde y de delay animados.
+**Fase 7 en cierre.** 20 presets de fábrica calibrados, **Create STAB**,
+navegador de presets con deshacer, producto completo en inglés y manual en
+inglés y español. Falta compilar el instalador (el script está listo).
 
-Build limpio sin warnings, 2.228.617 aserciones en verde, y **pluginval
+Build limpio sin warnings, 2.230.650 aserciones en verde, y **pluginval
 strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
 buffer (32 a 2048), con 163 parámetros.
 
@@ -44,6 +45,28 @@ Verificado por test: los 163 parámetros tienen control, nada se superpone en
 ninguna pestaña, los 123 controles interactivos tienen nombre accesible, y el
 contraste del texto secundario es 5,51:1 (WCAG pide 4,5). Detalle en
 [D-044](DECISIONS.md).
+
+### Presets y Create STAB
+
+**20 presets de fábrica**, cada uno con una intención concreta (Classic Organ
+Stab, Dub Techno Chord, Garage Swing, Rave Power Stab, Detroit Strings…), y
+todos **al mismo volumen, medido**: el golpe de cada uno queda en −18 dB. Sin
+calibrar iban de −14,6 a −29,9 dB, y pasar de uno a otro engañaba al oído
+([D-046](DECISIONS.md)). Cargar un preset nunca cambia la tonalidad ni la escala
+de tu tema ([D-045](DECISIONS.md)).
+
+**CREATE STAB** genera un sonido nuevo en ~100 ms. No sortea perillas al azar:
+elige un arquetipo, sortea dentro de rangos con sentido y **renderiza y verifica
+cada candidato** antes de que lo escuches. Tiene que sonar, no saturar, dejar
+los graves en mono, quedar al volumen de los presets y no parecerse a ningún
+sonido anterior ([D-047](DECISIONS.md)).
+
+| 40 generaciones con semillas fijas | Resultado |
+|---|---|
+| Aceptados en el primer render | 40 de 40 (1,02 renders por stab) |
+| Peor desvío de volumen | 0,94 dB |
+| Arquetipos distintos que aparecieron | 8 de 9 |
+| Distancia mínima entre sonidos generados | 0,060 (el umbral) |
 
 ### El secuenciador
 
@@ -174,7 +197,7 @@ Roadmap completo en [DECISIONS.md](DECISIONS.md).
 | 4 | Efectos: delay, reverb, chorus, saturación, pump | **completa** |
 | 5 | Secuenciador: gate rítmico, swing, sync al host | **completa** |
 | 6 | Identidad visual: GUI completa con visualizadores | **completa** |
-| 7 | Presets, pulido, distribución | — |
+| 7 | Presets, pulido, distribución | falta compilar el instalador |
 
 ---
 
@@ -215,6 +238,16 @@ O desde PowerShell:
 .\Scripts\build.ps1 -Clean
 .\Scripts\build.ps1 -NoCopy      # sin instalar en el sistema
 ```
+
+Para generar el **instalador** (hace falta [Inno Setup 6](https://jrsoftware.org/isdl.php)):
+
+```powershell
+.\Scripts\package.ps1               # compila y empaqueta
+.\Scripts\package.ps1 -SkipBuild    # reusa el build existente
+```
+
+Deja `build\installer\STABR-<versión>-Windows-x64-Setup.exe`. La versión sale del
+`CMakeLists.txt`.
 
 El VST3 se copia solo a `C:\Program Files\Common Files\VST3`. Si esa copia falla
 —porque un DAW tiene el plugin cargado y el archivo queda bloqueado, o porque la
@@ -275,9 +308,12 @@ Source/
   Chord/                generador de acordes, escalas y ruteo de notas
   FX/                   delay, reverb, chorus, saturacion, pump, salida
   Sequencer/            secuenciador de pasos, patrones de fabrica, latch
+  Presets/              presets de fabrica, analisis de sonido, Create STAB
   GUI/                  LookAndFeel, controles, visualizadores, grilla de pasos
 Tests/                  tests headless
-Scripts/                build, validación y el .bat de instalación
+Scripts/                build, validación, empaquetado y el .bat de instalación
+Installer/              script de Inno Setup
+docs/manual/            manual de usuario en inglés y español (HTML)
 cmake/                  JUCE pinneada, flags de warnings
 ```
 

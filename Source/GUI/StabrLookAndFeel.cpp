@@ -199,6 +199,13 @@ void StabrLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& bu
             g.fillRoundedRectangle (b, 4.0f);
         }
     }
+    else if ((bool) button.getProperties().getWithDefault ("accent", false))
+    {
+        // La accion principal de la pantalla: el unico boton lleno de acento.
+        const auto fill = down ? accent.darker (0.2f) : (highlighted ? accent.brighter (0.1f) : accent);
+        g.setColour (fill.withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.45f));
+        g.fillRoundedRectangle (b, 4.0f);
+    }
     else
     {
         g.setColour (down ? line : (highlighted ? raised.brighter (0.05f) : raised));
