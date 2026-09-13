@@ -5,8 +5,8 @@ namespace stabr
 {
 namespace
 {
-    constexpr int kW = gui::MainView::kBaseWidth;
-    constexpr int kH = gui::MainView::kBaseHeight;
+    constexpr int kW = gui::sp92::DeviceView::kBaseWidth;
+    constexpr int kH = gui::sp92::DeviceView::kBaseHeight;
 }
 
 StabrEditor::StabrEditor (StabrProcessor& p)
@@ -15,16 +15,17 @@ StabrEditor::StabrEditor (StabrProcessor& p)
       view (p),
       vblank (this, [this] { view.tick (juce::Time::getMillisecondCounterHiRes() * 0.001); })
 {
-    /*  La escala guardada se lee ANTES que nada. setResizeLimits acota el
-        tamano inicial (0x0) al minimo y eso dispara resized(), que escribe la
-        escala en el procesador: leyendola despues, todo proyecto abria la
-        interfaz al 75 %. Lo encontro el test de persistencia de la escala. */
+    /*  Lo guardado se lee ANTES que nada. setResizeLimits acota el tamano
+        inicial (0x0) al minimo y eso dispara resized(), que escribe la escala
+        en el procesador: leyendola despues, todo proyecto abria al 75 %. */
     const float savedScale = proc.getUiScale();
+    const int savedFinish = proc.getUiFinish();
 
     setLookAndFeel (&lookAndFeel);
     addAndMakeVisible (view);
 
     view.onScaleRequested = [this] (float s) { setUiScale (s); };
+    view.onFinishRequested = [this] (int f) { setFinish (f); };
 
     setResizable (true, true);
     setResizeLimits (juce::roundToInt (kW * kMinScale), juce::roundToInt (kH * kMinScale),
@@ -33,6 +34,7 @@ StabrEditor::StabrEditor (StabrProcessor& p)
     if (auto* bounds = getConstrainer())
         bounds->setFixedAspectRatio ((double) kW / (double) kH);
 
+    setFinish (savedFinish);
     setUiScale (savedScale);
 }
 
@@ -47,19 +49,30 @@ void StabrEditor::setUiScale (float scale)
     setSize (juce::roundToInt (kW * s), juce::roundToInt (kH * s));
 }
 
+void StabrEditor::setFinish (int index)
+{
+    const int f = juce::jlimit (0, gui::sp92::kNumFinishes - 1, index);
+    lookAndFeel.setFinish (gui::sp92::finish (f));
+    proc.setUiFinish (f);
+    view.setFinish (f);
+}
+
+int StabrEditor::getFinish() const noexcept
+{
+    return proc.getUiFinish();
+}
+
 void StabrEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (gui::colours::background);
+    g.fillAll (juce::Colour (0xff0f0d0b));
 }
 
 void StabrEditor::resized()
 {
     const float scale = (float) getWidth() / (float) kW;
 
-    // La vista se diseña a tamaño base y se escala entera. Ver MainView.h.
     view.setBounds (0, 0, kW, kH);
     view.setTransform (juce::AffineTransform::scale (scale));
-    view.setScaleIndicator (scale);
 
     proc.setUiScale (scale);
 }

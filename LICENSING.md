@@ -125,11 +125,18 @@ incorporación futura se anota acá con su licencia, y **debe ser permisiva**.
 
 ### Tipografías
 
-**Decisión de la Fase 6: no se embebe ninguna tipografía.** La interfaz usa las
-fuentes del sistema (la sans por defecto y la monoespaciada por defecto de JUCE,
-en Windows Segoe UI y Consolas). No se copian ni se redistribuyen: el plugin
+**Fase 8 (SP-92), estado actual: no se embebe ninguna tipografía.** La interfaz
+usa fuentes que trae Windows: **Bahnschrift** (marca y serigrafía) y **Segoe
+Print** (la cinta escrita a mano). No se copian ni se redistribuyen: el plugin
 sólo le pide al sistema operativo que dibuje con ellas, así que no hay licencia
-de embedding que resolver. Ver [DECISIONS.md](DECISIONS.md) D-042.
+de embedding que resolver. Ver [DECISIONS.md](DECISIONS.md) D-042 y D-049.
+
+**Previsto:** el diseño aprobado usa **Michroma**, **Archivo Narrow** y
+**Reenie Beanie**, las tres de Google Fonts bajo **SIL OFL 1.1**, que permite
+embeberlas en software comercial siempre que se incluya el texto de la licencia
+y no se vendan las fuentes solas. El código ya soporta embeberlas
+(`STABR_HAS_EMBEDDED_FONTS`); falta autorización para descargarlas. Al hacerlo:
+copiar `OFL.txt` de cada una al instalador y marcar esta sección.
 
 Si más adelante se quiere una letra propia (por identidad, o para que la
 interfaz se vea igual en otros sistemas), tiene que tener licencia que permita
@@ -146,5 +153,5 @@ elegida se documenta acá.
 - [ ] Revisar los lineamientos de marca VST de Steinberg para el material de marketing
 - [ ] (Si se decide sacar macOS) mac o CI con runners macOS, cuenta Apple Developer y notarización
 - [ ] Firma de código en Windows (certificado EV o el SmartScreen espanta usuarios)
-- [x] Tipografía de la GUI: fuentes del sistema, sin embedding (Fase 6). Revisar sólo si se embebe una
+- [x] Tipografía de la GUI: fuentes del sistema, sin embedding (Fase 8). Si se embeben las OFL, incluir sus licencias
 - [ ] Confirmar que no entró ningún código GPL/AGPL al árbol

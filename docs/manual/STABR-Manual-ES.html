@@ -31,7 +31,7 @@
 
 <p class="lang"><a href="STABR-Manual-EN.html">Read in English</a></p>
 <h1>STABR</h1>
-<p>Máquina de stabs de house y techno &middot; por Narfbach &middot; Manual de usuario, versión 0.7</p>
+<p>Máquina de stabs de house y techno &middot; por Narfbach &middot; Manual de usuario, versión 0.8</p>
 
 <p class="muted">La interfaz de STABR está en inglés. En este manual los nombres de los controles aparecen tal como se ven en pantalla.</p>
 
@@ -58,7 +58,7 @@
 
 <h2 id="instalacion">2. Instalación</h2>
 <ol>
-  <li>Ejecutá el instalador <code>STABR-0.7.0-Windows-x64-Setup.exe</code> y seguí los pasos.</li>
+  <li>Ejecutá el instalador <code>STABR-0.8.0-Windows-x64-Setup.exe</code> y seguí los pasos.</li>
   <li>El plugin se instala en <code>C:\Program Files\Common Files\VST3\STABR.vst3</code>, la carpeta VST3 estándar que revisan todos los DAW.</li>
   <li>Abrí tu DAW y volvé a escanear los plugins si STABR no aparece. Figura como instrumento de <strong>Narfbach</strong>.</li>
 </ol>
@@ -69,33 +69,44 @@
   <li>Cargá STABR en un canal de instrumento.</li>
   <li>Apretá cualquier tecla. Suena un acorde menor con séptima en La menor, la tonalidad por defecto.</li>
   <li>Poné <strong>Key</strong> y <strong>Scale</strong> en la tonalidad de tu tema. Desde ahí, cada tecla da un acorde que pertenece a ella: no hay forma de tocar un acorde equivocado.</li>
-  <li>Apretá <strong>CREATE STAB</strong>. Obtenés un sonido nuevo, verificado y al mismo volumen que el anterior. Seguí apretando hasta que uno te enganche.</li>
-  <li>Encendé <strong>Seq On</strong> y dale play en tu DAW. STABR toca el contratiempo solo.</li>
+  <li>Apretá el pad naranja <strong>STAB</strong>. Obtenés un sonido nuevo, verificado y al mismo volumen que el anterior. Seguí apretando hasta que uno te enganche.</li>
+  <li>Encendé <strong>&#9654; SEQ</strong> y dale play en tu DAW. STABR toca el contratiempo solo.</li>
 </ol>
 
 <h2 id="interfaz">4. La interfaz</h2>
-<img src="images/stabr-interface.png" alt="La interfaz de STABR">
+<img src="images/stabr-interface.png" alt="La interfaz STABR SP-92">
+<p>STABR se ve y se usa como un aparato: el <strong>SP-92</strong>, un sampler de stabs de acordes. Todo lo que ves es un control.</p>
 
-<h3>Cabecera</h3>
+<h3>Franja superior</h3>
 <ul>
-  <li><strong>&lt; Preset &gt;</strong>: recorre los 20 presets de fábrica y los tuyos. La lista está agrupada por estilo.</li>
-  <li><strong>Save</strong>: guarda el sonido actual como preset de usuario.</li>
-  <li><strong>CREATE STAB</strong>: genera un sonido nuevo. Ver <a href="#create">Create STAB</a>.</li>
+  <li><strong>POWER</strong>: el menú de configuración. Elegí el <strong>acabado</strong> (Beige '87, Graphite '92 o Arctic '89), el <strong>tamaño</strong> de 75&nbsp;% a 200&nbsp;%, o escribí en la cinta. También podés arrastrar la esquina inferior derecha. Acabado y tamaño se guardan con el proyecto.</li>
+  <li><strong>Disquetera</strong>: clic en el disquete para abrir la lista de sonidos, agrupada por estilo. El color del disquete dice el estilo: azul House, negro Techno, rojo Rave, verde World, amarillo Bass, violeta Atmos, crema los tuyos.</li>
+  <li><strong>&#9664; &#9654;</strong>: sonido anterior y siguiente. <strong>Save</strong>: guarda el sonido actual como disco de usuario.</li>
+</ul>
+
+<h3>Pantalla, teclas de función y encoders</h3>
+<ul>
+  <li>La <strong>pantalla de matriz de puntos</strong> muestra el nombre del sonido, el tempo y, en la página CHORD, el nombre del acorde que realmente estás escuchando con sus notas ubicadas por altura: así se ve el voicing y qué nota queda en el bajo.</li>
+  <li>Las siete <strong>teclas de función</strong> abren las páginas: <strong>CHORD, OSC, FILTER, DELAY, REVERB, FX, PUMP</strong>. Apretá de nuevo la tecla encendida para pasar a la subpágina siguiente. Cada página dibuja lo que controla: forma de onda, respuesta del filtro, repeticiones, cola de la reverb, curva de saturación, forma del pump.</li>
+  <li>Los seis <strong>encoders</strong> de abajo controlan los seis valores de la última fila de la pantalla. Al girar cualquier perilla, la pantalla muestra su valor exacto por un momento.</li>
+</ul>
+
+<h3>Tone y Echo</h3>
+<ul>
+  <li><strong>Tone</strong>: lo que más se toca. Cutoff, Resonance y Decay, más Env Amt y Drive.</li>
+  <li><strong>Echo</strong>: la pantalla chica muestra cada repetición en el tiempo (de izquierda a derecha) y en el estéreo (L arriba, R abajo), y las enciende a medida que suenan. Debajo: Time, Feedback y Mix, y las tres teclas de modo <strong>Stereo, Ping, Dub</strong>.</li>
+  <li><strong>VU</strong>: nivel de salida.</li>
+</ul>
+
+<h3>Sequence, Create y Lock</h3>
+<ul>
+  <li><strong>16 pads</strong>: una fila por tiempo. Ver <a href="#secuenciador">el secuenciador</a>.</li>
+  <li><strong>&#9654; SEQ</strong> enciende el secuenciador; la llave <strong>Pattern</strong> elige el ritmo; <strong>Swing</strong>, <strong>Gate</strong> y <strong>Rate</strong> le dan forma.</li>
+  <li><strong>STAB</strong>: genera un sonido nuevo, y las perillas giran hasta él. Ver <a href="#create">Create STAB</a>.</li>
   <li><strong>Undo / Redo</strong>: vuelve atrás o adelante entre cambios de sonido (presets, Create STAB).</li>
-  <li><strong>LOCK Chord / FX / Seq</strong>: partes que Create STAB deja sin tocar.</li>
-  <li><strong>Tamaño</strong>: la interfaz de 75&nbsp;% a 200&nbsp;%. También podés arrastrar la esquina inferior derecha. El tamaño se guarda con el proyecto.</li>
-  <li><strong>Medidor</strong>: nivel de salida, izquierda y derecha.</li>
+  <li><strong>LOCK Chord / FX / Seq</strong>: subí una palanca para que STAB no toque esa parte.</li>
+  <li><strong>Output</strong>: nivel de salida. <strong>La cinta</strong>: doble clic y escribile el nombre de tu tema.</li>
 </ul>
-
-<h3>Fila principal (siempre a la vista)</h3>
-<ul>
-  <li><strong>Chord</strong>: tipo de acorde, tonalidad y escala, y el <em>visualizador de acorde</em>. Muestra las notas que suenan ubicadas por altura, así se ve el voicing y qué nota queda en el bajo. Arriba, el nombre del acorde que realmente estás escuchando.</li>
-  <li><strong>Filter / Amp</strong>: lo que más se toca. Cutoff, Resonance y Decay, más la cantidad y el decay de la envolvente del filtro, y Drive.</li>
-  <li><strong>Delay</strong>: el visualizador muestra cada repetición en el tiempo (de izquierda a derecha) y en el estéreo (L arriba, R abajo), y las enciende a medida que suenan. Debajo: tiempo, modo, feedback y mezcla.</li>
-</ul>
-
-<h3>Pestañas</h3>
-<p>Todo lo demás está en siete pestañas: <strong>Chord, Osc, Filter, Delay, Reverb, FX, Pump / Out</strong>.</p>
 
 <h3>Gestos útiles</h3>
 <table>
@@ -136,14 +147,14 @@
 <p><strong>Polyphony</strong> cuenta acordes, no notas: cuántos stabs se pueden superponer. <strong>Bend</strong> define el rango del pitch bend.</p>
 
 <h2 id="sonido">6. Darle forma al sonido</h2>
-<h3>Osciladores (pestaña Osc)</h3>
+<h3>Osciladores (página OSC)</h3>
 <ul>
   <li><strong>Osc 1 y Osc 2</strong>: Saw, Pulse, Triangle, Organ (un órgano estilo M1) o Sine. Osc 2 suma Detune y Octave.</li>
   <li><strong>PW</strong>: ancho de pulso, para la onda Pulse.</li>
   <li><strong>Sub</strong>: un oscilador extra una o dos octavas abajo.</li>
   <li><strong>Unison</strong>: hasta 7 copias desafinadas por nota, repartidas en el estéreo. Rnd Phase hace que cada copia arranque en un punto distinto.</li>
 </ul>
-<h3>Filtro (fila principal y pestaña Filter)</h3>
+<h3>Filtro (sección Tone y página FILTER)</h3>
 <ul>
   <li><strong>Type</strong> Low Pass, Band Pass, High Pass, y <strong>Slope</strong> de 12 o 24 dB/oct.</li>
   <li><strong>Resonance</strong> puede auto-oscilar al final de su recorrido, de forma segura.</li>
@@ -180,7 +191,7 @@
 </ul>
 
 <h2 id="secuenciador">8. El secuenciador</h2>
-<p>Encendé <strong>Seq On</strong> y dale play en tu DAW: STABR toca el patrón solo, perfectamente en tiempo. Sigue a tu transporte: arranca, para, hace loop y salta con él, y un render suena exactamente igual que la reproducción.</p>
+<p>Encendé <strong>&#9654; SEQ</strong> y dale play en tu DAW: STABR toca el patrón solo, perfectamente en tiempo. Sigue a tu transporte: arranca, para, hace loop y salta con él, y un render suena exactamente igual que la reproducción.</p>
 
 <h3>Qué toca (latch)</h3>
 <ul>
@@ -237,7 +248,7 @@
 <h3>Dub techno</h3>
 <p>Cargá <em>Dub Techno Chord</em>, o armalo: Min7 con Density 3, Cutoff cerca de 750&nbsp;Hz con Env Amount alrededor de 60&nbsp;%, Delay Mode <strong>Dub</strong> en <strong>1/8.</strong> con Feedback 65&nbsp;% y LP cerca de 3&nbsp;kHz, Reverb <strong>Hall</strong> con Mix 30&nbsp;%. Tocá una tecla cada dos compases y dejá que se disuelva. Apretá <strong>Freeze</strong> en el punto más alto.</p>
 <h3>Groove de garage</h3>
-<p>Onda Organ, Min9, Seq On con <em>Skippy 16ths</em>, Swing cerca de 60&nbsp;%, Gate 35&nbsp;% y un delay ping-pong corto.</p>
+<p>Onda Organ, Min9, &#9654; SEQ encendido con <em>Skippy 16ths</em>, Swing cerca de 60&nbsp;%, Gate 35&nbsp;% y un delay ping-pong corto.</p>
 <h3>Seguridad para el club</h3>
 <p>Dejá <strong>Mono Below</strong> en 120&nbsp;Hz o más y el <strong>Limiter</strong> encendido. Usá <strong>Pump</strong> en negras si no tenés un sidechain armado.</p>
 
@@ -245,10 +256,10 @@
 <table>
   <tr><th>Problema</th><th>Solución</th></tr>
   <tr><td>STABR no aparece en mi DAW</td><td>Volvé a escanear los plugins y revisá que <code>C:\Program Files\Common Files\VST3</code> esté entre las carpetas VST3 de tu DAW.</td></tr>
-  <tr><td>Con Seq On, apretar teclas no dispara sonido</td><td>Es a propósito mientras el transporte anda: las teclas eligen el acorde y el patrón lo toca. Pará el transporte para tocar en vivo.</td></tr>
+  <tr><td>Con &#9654; SEQ encendido, apretar teclas no dispara sonido</td><td>Es a propósito mientras el transporte anda: las teclas eligen el acorde y el patrón lo toca. Pará el transporte para tocar en vivo.</td></tr>
   <tr><td>Todo suena un poco tarde</td><td>Estás en Note Mode <strong>Auto</strong>, que necesita 20&nbsp;ms para detectar acordes. Tu DAW lo compensa; para tocar en vivo usá <strong>Chord</strong> o <strong>Passthrough</strong>.</td></tr>
   <tr><td>Uso alto de CPU</td><td>El drive y el unísono son los ajustes más caros, y HQ Mode mucho más. Bajá Polyphony o apagá HQ Mode mientras producís.</td></tr>
-  <tr><td>Create STAB no hizo nada</td><td>Ignora los clics mientras genera un sonido. Esperá a que el botón vuelva a decir CREATE STAB.</td></tr>
+  <tr><td>Create STAB no hizo nada</td><td>Ignora los clics mientras genera un sonido. Esperá a que la pantalla deje de mostrar CREATING.</td></tr>
 </table>
 
 <h2 id="especificaciones">12. Especificaciones</h2>

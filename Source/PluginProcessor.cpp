@@ -3,6 +3,7 @@
 #include "Params/ParameterIDs.h"
 #include "Params/ParameterLayout.h"
 #include "Common/StateVersion.h"
+#include "Common/Utf8.h"
 
 namespace stabr
 {
@@ -12,6 +13,8 @@ StabrProcessor::StabrProcessor()
       apvts (*this, nullptr, state::rootType, createParameterLayout())
 {
     p.resolve (apvts);
+
+    tapeText = utf8 ("dub chords \xe2\x80\x94 124");
 
     startTimer (100);
 }
@@ -430,6 +433,9 @@ void StabrProcessor::getStateInformation (juce::MemoryBlock& destData)
     tree.setProperty (state::versionProperty, state::kCurrentVersion, nullptr);
     tree.setProperty (state::uiScaleProperty, getUiScale(), nullptr);
     tree.setProperty (state::presetNameProperty, presetManager.getCurrentPresetName(), nullptr);
+    tree.setProperty (state::uiFinishProperty, getUiFinish(), nullptr);
+    tree.setProperty (state::uiLocksProperty, getUiLocks(), nullptr);
+    tree.setProperty (state::uiTapeProperty, getTapeText(), nullptr);
 
     if (auto xml = tree.createXml())
         copyXmlToBinary (*xml, destData);
@@ -454,6 +460,15 @@ void StabrProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     if (tree.hasProperty (state::presetNameProperty))
         presetManager.setCurrentPresetName (tree.getProperty (state::presetNameProperty).toString());
+
+    if (tree.hasProperty (state::uiFinishProperty))
+        setUiFinish ((int) tree.getProperty (state::uiFinishProperty));
+
+    if (tree.hasProperty (state::uiLocksProperty))
+        setUiLocks ((int) tree.getProperty (state::uiLocksProperty));
+
+    if (tree.hasProperty (state::uiTapeProperty))
+        setTapeText (tree.getProperty (state::uiTapeProperty).toString());
 
     /*  Los parametros que un proyecto viejo no trae (los del secuenciador en un
         proyecto de la v0.4) quedan en su DEFAULT, no en el valor que tuviera la

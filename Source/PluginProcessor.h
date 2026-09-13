@@ -69,6 +69,26 @@ public:
     float getUiScale() const noexcept     { return uiScale.load (std::memory_order_relaxed); }
     void  setUiScale (float s) noexcept   { uiScale.store (juce::jlimit (0.75f, 2.0f, s), std::memory_order_relaxed); }
 
+    /*  Estado de la interfaz del SP-92 que se guarda con el proyecto: acabado,
+        candados de Create STAB (bits: 1 acorde, 2 efectos, 4 secuenciador) y
+        el texto de la cinta. */
+    int  getUiFinish() const noexcept     { return uiFinish.load (std::memory_order_relaxed); }
+    void setUiFinish (int f) noexcept     { uiFinish.store (juce::jlimit (0, 2, f), std::memory_order_relaxed); }
+    int  getUiLocks() const noexcept      { return uiLocks.load (std::memory_order_relaxed); }
+    void setUiLocks (int bits) noexcept   { uiLocks.store (bits & 7, std::memory_order_relaxed); }
+
+    juce::String getTapeText() const
+    {
+        const juce::ScopedLock sl (uiTextLock);
+        return tapeText;
+    }
+
+    void setTapeText (const juce::String& text)
+    {
+        const juce::ScopedLock sl (uiTextLock);
+        tapeText = text;
+    }
+
     /*  Solo para tests y mediciones: no llamar desde la GUI sin un FIFO. */
     int getActiveVoiceCount() const noexcept { return voices.getActiveVoiceCount(); }
     int getOscillatorCount()  const noexcept { return voices.getOscillatorCount(); }
@@ -95,6 +115,12 @@ private:
     int triggersThisBlock = 0;
     float lastTriggerVelocity = 0.0f;
     std::atomic<float> uiScale { 1.0f };
+    std::atomic<int> uiFinish { 0 };
+    std::atomic<int> uiLocks { 0 };
+
+    // Lock y no atomico: un String no es atomico. Nunca se toca desde audio.
+    mutable juce::CriticalSection uiTextLock;
+    juce::String tapeText;
 
     juce::AudioProcessorValueTreeState apvts;
     presets::PresetManager presetManager { apvts };

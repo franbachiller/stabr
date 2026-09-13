@@ -994,3 +994,50 @@ como un programa distinto. El desinstalador no borra los presets de usuario.
 **Pendiente:** firmar el instalador y el plugin con un certificado de código.
 Sin firma, SmartScreen muestra una advertencia al instalar. Está en el
 checklist de LICENSING.md.
+
+## D-049 · Fase 8 · La interfaz es un aparato: el SP-92
+
+**Decisión del usuario:** de las propuestas de rediseño eligió "el sampler donde
+nació el stab" y aprobó el mockup tal cual, con los **tres acabados**
+seleccionables (Beige '87, Graphite '92, Arctic '89). La regla de la Fase 6
+(solo vectores, grafito y un acento) queda sin efecto por pedido explícito.
+
+**Cómo se consigue el realismo sin imágenes:** todo es procedural. Degradés
+para el plástico, un mosaico de ruido con semilla fija para la textura, el LCD
+como un framebuffer real de 190 × 72 puntos (fuente 5×7 propia) con los puntos
+apagados cacheados en una imagen a escala física y los encendidos con halo. El
+chasis (serigrafía, marcos, placa, tornillos) se pinta una sola vez con
+`setBufferedToImage`: cambia con el acabado o la escala, nunca por animación.
+Sin bitmaps el aparato queda nítido de 75 % a 200 %.
+
+**Decisiones de interacción, tomadas por mí e informadas:**
+- El color del LCD sigue al acabado (verde, ámbar, azul): es parte de la
+  identidad de cada uno.
+- 4 × 4 pads de goma para los 16 pasos: una fila por tiempo.
+- 7 teclas de función con **subpáginas** (apretar de nuevo avanza) y 6
+  encoders que se re-enganchan a los parámetros de la página. Las páginas más
+  los controles fijos cubren los 163 parámetros; lo verifica un test.
+- Las perillas **giran animadas** hasta el sonido nuevo al cargar un preset o
+  apretar STAB (tween visual de 0,45 s; el parámetro cambia al instante).
+- La disquetera abre la lista de sonidos; el color del disquete dice el
+  estilo.
+- POWER abre el menú de configuración: acabado, tamaño y escribir en la cinta.
+- La cinta con texto a mano se edita con doble clic y se guarda con el
+  proyecto, igual que el acabado y los candados (`ui_finish`, `ui_locks`,
+  `ui_tape`, propiedades del estado, no parámetros).
+- La tecla "Play" del mockup se llama **▶ SEQ**: no controla el transporte del
+  DAW, enciende el secuenciador. Un nombre que prometa otra cosa sería mentira.
+
+**Tipografías:** el mockup usa Michroma, Archivo Narrow y Reenie Beanie (OFL).
+Hasta que se autorice descargarlas, el código cae a fuentes del sistema de
+Windows (Bahnschrift y Segoe Print), que no se redistribuyen. El soporte para
+embeberlas ya está (`STABR_HAS_EMBEDDED_FONTS`).
+
+**Verificado por test:** los 163 parámetros alcanzables; las 16 subpáginas
+enganchan los encoders correctos; 46 piezas sin salirse ni pisarse; 19
+perillas, 22 botones y 16 pasos con nombre accesible y foco de teclado; ningún
+valor del LCD pasa de 5 caracteres ni usa un carácter sin glifo (924 valores
+barridos); contraste WCAG ≥ 4,5 en los tres acabados (serigrafía 7,8 / 7,8 /
+8,1; pantalla 6,2 / 10,8 / 7,7); escala, acabado y cinta sobreviven a
+guardar y reabrir. Un cuadro completo del aparato cuesta ~50 ms en render por
+software en el peor caso; en uso real solo se repinta lo que cambia.

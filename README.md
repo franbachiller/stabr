@@ -13,38 +13,42 @@ Desarrollado por **Narfbach**.
 
 ## Estado
 
-**Fase 7 en cierre.** 20 presets de fábrica calibrados, **Create STAB**,
-navegador de presets con deshacer, producto completo en inglés y manual en
-inglés y español. Falta compilar el instalador (el script está listo).
+**Fase 8: la interfaz SP-92.** 20 presets de fábrica calibrados, **Create
+STAB**, deshacer, producto en inglés, manual en inglés y español, instalador
+Inno Setup, y la interfaz nueva: un sampler de 1992 con tres acabados.
 
-Build limpio sin warnings, 2.230.650 aserciones en verde, y **pluginval
-strictness 10 en SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de
-buffer (32 a 2048), con 163 parámetros.
+Build limpio sin warnings, tests en verde, y **pluginval strictness 10 en
+SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de buffer (32 a
+2048), con 163 parámetros.
 
-### La interfaz
+### La interfaz: STABR SP-92
 
-Estilo hardware de estudio: grafito, un solo acento naranja, perillas con
-cuerpo. Arriba y siempre a la vista, lo que más se toca: acorde y tonalidad,
-cutoff / resonancia / decay, el delay y el secuenciador. El resto, en siete
-pestañas.
+![STABR SP-92](docs/manual/images/stabr-interface.png)
 
-- **Visualizador de acorde:** las notas que suenan, ubicadas por altura, así se
-  ve el voicing y qué nota queda en el bajo. Arriba, el nombre **detectado** del
-  acorde: con Diatonic, "Min7" en la tecla Si se muestra como lo que suena,
-  Bm7b5.
-- **Visualizador de delay:** cada repetición en el tiempo y en el estéreo
-  (L arriba, R abajo), calculada con el mismo modelo que el delay, y encendida
+El plugin es un aparato: el sampler donde nació el stab. Plástico con textura,
+pantalla de matriz de puntos retroiluminada, pads de goma, palancas, VU de
+aguja, disquetera. Todo dibujado por código, sin imágenes, nítido de 75 % a
+200 %. Tres acabados: **Beige '87**, **Graphite '92** y **Arctic '89**, que se
+eligen desde POWER.
+
+- **Pantalla 190 × 72:** el acorde que suena con su nombre **detectado** y el
+  voicing por altura; en cada página, un gráfico (forma de onda, respuesta del
+  filtro, repeticiones, cola de reverb, curva de saturación, pump).
+- **7 teclas de función y 6 encoders:** cada tecla abre una página, apretarla
+  de nuevo pasa de subpágina, y los encoders controlan lo que muestra la
+  pantalla.
+- **Pantalla de eco:** cada repetición en el tiempo y en el estéreo, encendida
   por cada golpe real.
-- **Grilla de pasos:** clic enciende, arrastrar ajusta la velocity, clic
-  derecho abre ratchet y probabilidad. Editar un patrón de fábrica lo copia a
-  `Custom`.
-- **Teclado:** todo control se alcanza con Tab; flechas para mover perillas y
-  pasos, espacio para encender. Doble clic vuelve una perilla a su default.
+- **16 pads:** clic enciende, arrastrar ajusta la velocity, clic derecho abre
+  ratchet y probabilidad. Editar un patrón de fábrica lo copia a `Custom`.
+- **STAB** genera un sonido nuevo y las perillas giran hasta él. Las palancas
+  **LOCK** protegen acorde, efectos o secuencia.
+- **Disquetera:** la lista de sonidos; el color del disquete dice el estilo.
+- **Cinta:** doble clic para escribirle el nombre de tu tema.
 
-Verificado por test: los 163 parámetros tienen control, nada se superpone en
-ninguna pestaña, los 123 controles interactivos tienen nombre accesible, y el
-contraste del texto secundario es 5,51:1 (WCAG pide 4,5). Detalle en
-[D-044](DECISIONS.md).
+Verificado por test ([D-049](DECISIONS.md)): los 163 parámetros tienen control,
+46 piezas sin pisarse, todo control con nombre accesible y foco de teclado,
+contraste WCAG ≥ 4,5 en los tres acabados.
 
 ### Presets y Create STAB
 

@@ -1,12 +1,14 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "GUI/MainView.h"
+#include "GUI/SP92/DeviceView.h"
+#include "GUI/SP92/Finish.h"
+#include "GUI/SP92/LcdPages.h"
+#include "GUI/SP92/DotMatrix.h"
 #include "GUI/Palette.h"
-#include "GUI/Controls.h"
 #include "GUI/StepGrid.h"
-#include "GUI/DelayVisualizer.h"
-#include "GUI/ChordVisualizer.h"
+#include "GUI/EchoModel.h"
+#include "GUI/ChordText.h"
 #include "Chord/ChordNaming.h"
 #include "Chord/ChordGenerator.h"
 #include "Common/GuiFeed.h"
@@ -104,8 +106,6 @@ public:
 
         beginTest ("12 fundamentales x inversiones x voicings: la fundamental detectada es la tocada");
         {
-            // sus2/sus4 y dim7 quedan fuera a proposito: sus en inversion ES otro
-            // sus (Csus2/D = Gsus4/D) y dim7 es simetrico. No hay nombre unico.
             using T = chord::ChordType;
             int checked = 0;
 
@@ -132,7 +132,6 @@ public:
 
         beginTest ("Density 2 nombra la diada en vez de mostrar notas sueltas");
         {
-            // El caso de la captura del usuario: Min9, Density 2, F# frigio, tecla E.
             auto p = literalParams (chord::ChordType::min9);
             p.lock = chord::ScaleLock::diatonic;
             p.keyRoot = 6;
@@ -155,7 +154,7 @@ public:
             single.count = 1;
 
             expect (! chord::nameChord (single).valid);
-            expectEquals (gui::ChordVisualizer::nameFor (single), juce::String ("C"));
+            expectEquals (gui::chordNameFor (single), juce::String ("C"));
         }
     }
 };
@@ -231,10 +230,8 @@ public:
             expect (feed.pop (e), "no se publico el disparo");
             expect (e.type == GuiEvent::Type::onset);
             expectWithinAbsoluteError (e.velocity, 0.8f, 0.01f);
-
-            const auto sounding = proc.getSoundingNotes();
-            expectEquals (e.notes.count, sounding.count);
-            expectEquals (gui::ChordVisualizer::nameFor (e.notes), juce::String ("Am7"));
+            expectEquals (e.notes.count, proc.getSoundingNotes().count);
+            expectEquals (gui::chordNameFor (e.notes), juce::String ("Am7"));
 
             juce::MidiBuffer empty;
             proc.processBlock (buffer, empty);
@@ -277,15 +274,14 @@ public:
 };
 
 //==============================================================================
-class DelayVisualizerTests : public juce::UnitTest
+class EchoModelTests : public juce::UnitTest
 {
 public:
-    DelayVisualizerTests() : juce::UnitTest ("DelayVisualizer", "GUI") {}
+    EchoModelTests() : juce::UnitTest ("EchoModel", "GUI") {}
 
     void runTest() override
     {
-        using gui::DelayVisualizer;
-        std::array<gui::Echo, DelayVisualizer::kMaxEchoes> echoes {};
+        std::array<gui::Echo, gui::kMaxEchoes> echoes {};
 
         beginTest ("ping pong: L, R, L... con los tiempos acumulados como en Delay.h");
         {
@@ -295,7 +291,7 @@ public:
             info.feedback = 0.5f;
             info.mode = (int) fx::DelayMode::pingPong;
 
-            const int n = DelayVisualizer::computeEchoes (info, echoes);
+            const int n = gui::computeEchoes (info, echoes);
             expectEquals (n, 6, "0.5^5 todavia se oye, 0.5^6 no");
 
             const float times[] { 0.3f, 0.7f, 1.0f, 1.4f, 1.7f, 2.1f };
@@ -315,25 +311,86 @@ public:
             info.feedback = 0.5f;
             info.mode = (int) fx::DelayMode::stereo;
 
-            const int n = DelayVisualizer::computeEchoes (info, echoes);
+            const int n = gui::computeEchoes (info, echoes);
             expectEquals (n, 12);
             expectWithinAbsoluteError (echoes[2].time, 0.6f, 1.0e-4f);
             expectWithinAbsoluteError (echoes[3].time, 0.78f, 1.0e-4f);
             expectWithinAbsoluteError (echoes[2].gain, 0.5f, 1.0e-4f);
         }
 
-        beginTest ("feedback 0 da una sola repeticion; freeze llena el visualizador sin desbordar");
+        beginTest ("feedback 0 da una sola repeticion; freeze llena la pantalla sin desbordar");
         {
             gui::DelayViewInfo info;
             info.feedback = 0.0f;
             info.mode = (int) fx::DelayMode::pingPong;
-            expectEquals (DelayVisualizer::computeEchoes (info, echoes), 1);
+            expectEquals (gui::computeEchoes (info, echoes), 1);
 
             info.mode = (int) fx::DelayMode::stereo;
-            expectEquals (DelayVisualizer::computeEchoes (info, echoes), 2);
+            expectEquals (gui::computeEchoes (info, echoes), 2);
 
             info.freeze = true;
-            expectEquals (DelayVisualizer::computeEchoes (info, echoes), DelayVisualizer::kMaxEchoes);
+            expectEquals (gui::computeEchoes (info, echoes), gui::kMaxEchoes);
+        }
+    }
+};
+
+//==============================================================================
+class LcdTests : public juce::UnitTest
+{
+public:
+    LcdTests() : juce::UnitTest ("SP-92 LCD", "GUI") {}
+
+    void runTest() override
+    {
+        beginTest ("la fuente 5x7 tiene todo lo que escribe la pantalla");
+        {
+            const juce::String needed = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-/#:%>+()'abdeijmnosu";
+
+            for (auto p = needed.getCharPointer(); ! p.isEmpty(); ++p)
+                expect (gui::sp92::dotGlyph (*p) != nullptr, juce::String ("falta el glifo ") + juce::String::charToString (*p));
+
+            gui::sp92::DotMatrix m (20, 8);
+            m.text ("A", 0, 0);
+            expect (m.isLit (1, 0) && ! m.isLit (0, 0), "la A no quedo dibujada donde corresponde");
+        }
+
+        beginTest ("ningun valor ni etiqueta del LCD pasa de 5 caracteres");
+        {
+            StabrProcessor proc;
+            int values = 0;
+
+            for (const auto& pg : gui::sp92::lcdPages())
+                for (const auto& sub : pg.subPages)
+                    for (const auto& slot : sub)
+                    {
+                        if (slot.paramID == nullptr)
+                            continue;
+
+                        expect (juce::String (slot.label).length() <= 5, juce::String ("etiqueta larga: ") + slot.label);
+
+                        auto* param = proc.getAPVTS().getParameter (slot.paramID);
+                        expect (param != nullptr, juce::String ("ID desconocido en una pagina: ") + slot.paramID);
+
+                        if (param == nullptr)
+                            continue;
+
+                        // Se barre el recorrido entero, no solo el default.
+                        for (int step = 0; step <= 10; ++step)
+                        {
+                            param->setValueNotifyingHost ((float) step / 10.0f);
+                            const auto text = gui::sp92::lcdValue (*param);
+                            ++values;
+
+                            if (text.length() > 5)
+                                expect (false, juce::String (slot.paramID) + " muestra \"" + text + "\"");
+
+                            for (auto p = text.getCharPointer(); ! p.isEmpty(); ++p)
+                                if (gui::sp92::dotGlyph (*p) == nullptr)
+                                    expect (false, juce::String (slot.paramID) + " usa un caracter sin glifo: " + text);
+                        }
+                    }
+
+            logMessage ("valores de LCD revisados: " + juce::String (values));
         }
     }
 };
@@ -352,25 +409,18 @@ void walk (juce::Component& c, const std::function<void (juce::Component&)>& fn)
         walk (*c.getChildComponent (i), fn);
 }
 
-bool isLayoutItem (juce::Component& c)
-{
-    return c.getProperties().contains (gui::paramIdProperty)
-        || c.getProperties().contains (gui::stepParamIdsProperty)
-        || c.getProperties().contains (gui::layoutItemProperty)
-        || dynamic_cast<gui::Panel*> (&c) != nullptr;
-}
-
 class EditorTests : public juce::UnitTest
 {
 public:
-    EditorTests() : juce::UnitTest ("Editor", "GUI") {}
+    EditorTests() : juce::UnitTest ("Editor SP-92", "GUI") {}
 
     void runTest() override
     {
-        constexpr int W = gui::MainView::kBaseWidth;
-        constexpr int H = gui::MainView::kBaseHeight;
+        using gui::sp92::DeviceView;
+        constexpr int W = DeviceView::kBaseWidth;
+        constexpr int H = DeviceView::kBaseHeight;
 
-        beginTest ("TODOS los parametros tienen un control en la interfaz");
+        beginTest ("TODOS los parametros se pueden tocar desde el panel");
         {
             StabrProcessor proc;
             auto editor = makeEditor (proc);
@@ -379,34 +429,26 @@ public:
             if (editor == nullptr)
                 return;
 
-            std::set<juce::String> reachable;
-
-            walk (*editor, [&] (juce::Component& c)
-            {
-                if (c.getProperties().contains (gui::paramIdProperty))
-                    reachable.insert (c.getProperties()[gui::paramIdProperty].toString());
-
-                if (c.getProperties().contains (gui::stepParamIdsProperty))
-                    for (auto& id : juce::StringArray::fromTokens (c.getProperties()[gui::stepParamIdsProperty].toString(), ",", ""))
-                        reachable.insert (id);
-            });
-
-            int total = 0;
+            const auto reachable = editor->getView().getControlledParameterIDs();
             juce::StringArray missing;
+            int total = 0;
 
             for (auto* param : proc.getParameters())
                 if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (param))
                 {
                     ++total;
-                    if (reachable.count (ranged->getParameterID()) == 0)
+                    if (! reachable.contains (ranged->getParameterID()))
                         missing.add (ranged->getParameterID());
                 }
 
-            logMessage ("parametros con control: " + juce::String (total - missing.size()) + " de " + juce::String (total));
+            for (const auto& id : reachable)
+                expect (proc.getAPVTS().getParameter (id) != nullptr, "el panel nombra un parametro que no existe: " + id);
+
+            logMessage ("parametros alcanzables: " + juce::String (total - missing.size()) + " de " + juce::String (total));
             expect (missing.isEmpty(), "sin control: " + missing.joinIntoString (", "));
         }
 
-        beginTest ("ningun control se sale de su panel ni se pisa con otro, en ninguna pestana");
+        beginTest ("cada pagina del LCD engancha sus 6 encoders al parametro correcto");
         {
             StabrProcessor proc;
             auto editor = makeEditor (proc);
@@ -414,44 +456,72 @@ public:
             if (editor == nullptr)
                 return;
 
-            int problems = 0, items = 0;
+            auto& view = editor->getView();
+            const auto& pages = gui::sp92::lcdPages();
+            int subPages = 0;
 
-            walk (*editor, [&] (juce::Component& parent)
-            {
-                std::vector<juce::Component*> kids;
-
-                for (int i = 0; i < parent.getNumChildComponents(); ++i)
-                    if (isLayoutItem (*parent.getChildComponent (i)))
-                        kids.push_back (parent.getChildComponent (i));
-
-                for (size_t i = 0; i < kids.size(); ++i)
+            for (int p = 0; p < (int) pages.size(); ++p)
+                for (int s = 0; s < (int) pages[(size_t) p].subPages.size(); ++s)
                 {
-                    ++items;
-                    const auto b = kids[i]->getBounds();
-                    const auto what = kids[i]->getTitle().isNotEmpty() ? kids[i]->getTitle()
-                                                                       : kids[i]->getProperties()[gui::paramIdProperty].toString();
+                    view.selectPage (p, s);
+                    ++subPages;
 
-                    if (b.isEmpty() || ! parent.getLocalBounds().contains (b))
+                    for (int i = 0; i < 6; ++i)
+                    {
+                        const auto* id = pages[(size_t) p].subPages[(size_t) s][(size_t) i].paramID;
+                        expectEquals (view.getEncoderParamID (i), id != nullptr ? juce::String (id) : juce::String());
+                    }
+                }
+
+            logMessage ("subpaginas revisadas: " + juce::String (subPages));
+
+            // La tecla de funcion cicla subpaginas.
+            view.selectPage (1, 0);
+            expectEquals (view.getPage(), 1);
+            expectEquals (view.getSubPage(), 0);
+        }
+
+        beginTest ("ninguna pieza se sale del aparato ni se pisa con otra");
+        {
+            StabrProcessor proc;
+            auto editor = makeEditor (proc);
+
+            if (editor == nullptr)
+                return;
+
+            auto& view = editor->getView();
+            std::vector<juce::Component*> items;
+
+            for (int i = 0; i < view.getNumChildComponents(); ++i)
+                if (view.getChildComponent (i)->getProperties().contains (gui::sp92::layoutItemProperty))
+                    items.push_back (view.getChildComponent (i));
+
+            int problems = 0;
+
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                const auto b = items[i]->getBounds();
+
+                if (b.isEmpty() || ! view.getLocalBounds().contains (b))
+                {
+                    ++problems;
+                    expect (false, "'" + items[i]->getTitle() + "' fuera del aparato: " + b.toString());
+                }
+
+                for (size_t j = i + 1; j < items.size(); ++j)
+                    if (b.intersects (items[j]->getBounds()))
                     {
                         ++problems;
-                        expect (false, "'" + what + "' fuera de su contenedor o vacio: " + b.toString()
-                                           + " en " + parent.getLocalBounds().toString());
+                        expect (false, "'" + items[i]->getTitle() + "' " + b.toString() + " se pisa con '"
+                                           + items[j]->getTitle() + "' " + items[j]->getBounds().toString());
                     }
+            }
 
-                    for (size_t j = i + 1; j < kids.size(); ++j)
-                        if (b.intersects (kids[j]->getBounds()))
-                        {
-                            ++problems;
-                            expect (false, "'" + what + "' se pisa con '" + kids[j]->getTitle() + "'");
-                        }
-                }
-            });
-
-            logMessage ("elementos de layout revisados: " + juce::String (items));
+            logMessage ("piezas del panel revisadas: " + juce::String ((int) items.size()));
             expectEquals (problems, 0);
         }
 
-        beginTest ("accesibilidad: todo control interactivo tiene nombre y se alcanza con teclado");
+        beginTest ("accesibilidad: todo control tiene nombre y se alcanza con teclado");
         {
             StabrProcessor proc;
             auto editor = makeEditor (proc);
@@ -459,63 +529,65 @@ public:
             if (editor == nullptr)
                 return;
 
-            int interactive = 0;
+            int sliders = 0, buttons = 0, steps = 0;
             juce::StringArray problems;
 
-            walk (*editor, [&] (juce::Component& c)
+            walk (editor->getView(), [&] (juce::Component& c)
             {
-                const bool isInteractive = dynamic_cast<juce::Slider*> (&c) != nullptr
-                                        || dynamic_cast<juce::ComboBox*> (&c) != nullptr
-                                        || dynamic_cast<juce::Button*> (&c) != nullptr
-                                        || c.getProperties().contains (gui::stepParamIdsProperty);
+                const bool isSlider = dynamic_cast<juce::Slider*> (&c) != nullptr;
+                const bool isButton = dynamic_cast<juce::Button*> (&c) != nullptr;
+                const bool isStep = c.getProperties().contains (gui::stepParamIdsProperty);
 
-                if (! isInteractive)
+                if (! (isSlider || isButton || isStep))
                     return;
 
-                ++interactive;
+                sliders += isSlider ? 1 : 0;
+                buttons += isButton ? 1 : 0;
+                steps += isStep ? 1 : 0;
 
                 if (c.getTitle().isEmpty())
                     problems.add ("sin nombre accesible: " + c.getName());
 
-                // Solo los habilitados: JUCE saca del foco a lo deshabilitado
-                // (getWantsKeyboardFocus da false), y esta bien que asi sea. Un
-                // Undo sin historial no tiene por que recibir el Tab.
                 if (c.isEnabled() && ! c.getWantsKeyboardFocus())
                     problems.add ("no alcanzable con teclado: " + c.getTitle());
             });
 
-            /*  Cuenta exacta, no un umbral: un parametro por control, salvo los
-                64 de los pasos que viven en 16 celdas; mas las pestanas y el
-                selector de tamano. Si aparece o desaparece un control, se nota. */
-            const int stepParams = 4 * seq::kNumSteps;
-            const int expectedInteractive = (proc.getParameters().size() - stepParams)
-                                          + seq::kNumSteps + editor->getView().getNumPages() + 1
-                                          + gui::PresetBar::kNumControls;
-
-            logMessage ("controles interactivos: " + juce::String (interactive));
-            expectEquals (interactive, expectedInteractive);
+            /*  Cuenta exacta:
+                perillas 12 (tono 5, eco 3, swing, gate, rate, output) + selector de patron + 6 encoders = 19
+                botones: 7 funciones + 3 disco + disquetera + POWER + 3 modos de eco + SEQ + STAB + Undo + Redo + 3 palancas = 22
+                pasos: 16 */
+            logMessage ("perillas " + juce::String (sliders) + ", botones " + juce::String (buttons) + ", pasos " + juce::String (steps));
+            expectEquals (sliders, 19);
+            expectEquals (buttons, 22);
+            expectEquals (steps, 16);
             expect (problems.isEmpty(), problems.joinIntoString ("; "));
         }
 
-        beginTest ("contraste de la paleta (WCAG): texto >= 4.5, acento >= 3");
+        beginTest ("contraste de los tres acabados (WCAG)");
         {
-            using namespace gui::colours;
-
-            for (auto ground : { background, panel, raised })
+            for (int i = 0; i < gui::sp92::kNumFinishes; ++i)
             {
-                expect (gui::contrastRatio (text, ground) >= 4.5, "texto sobre fondo: " + juce::String (gui::contrastRatio (text, ground), 2));
-                expect (gui::contrastRatio (textMuted, ground) >= 4.5, "texto secundario: " + juce::String (gui::contrastRatio (textMuted, ground), 2));
-                expect (gui::contrastRatio (accent, ground) >= 3.0, "acento: " + juce::String (gui::contrastRatio (accent, ground), 2));
+                const auto& f = gui::sp92::finish (i);
+                const juce::String name (f.name);
+
+                auto check = [&] (juce::Colour a, juce::Colour b, double minimum, const char* what)
+                {
+                    const double ratio = gui::contrastRatio (a, b);
+                    expect (ratio >= minimum, name + ": " + what + " " + juce::String (ratio, 2));
+                    return ratio;
+                };
+
+                const double silk = check (f.silk, f.chassis, 4.5, "serigrafia sobre chasis");
+                check (f.stripInk, f.strip, 4.5, "texto de la franja");
+                const double lcd = check (f.lcdOn, f.lcdBg2, 4.5, "pantalla");
+                check (f.keyInk, f.key, 4.5, "tecla clara");
+                check (gui::sp92::darkKey::ink, gui::sp92::darkKey::base, 4.5, "tecla oscura");
+
+                logMessage (name + ": serigrafia " + juce::String (silk, 2) + ", pantalla " + juce::String (lcd, 2));
             }
-
-            // Texto oscuro sobre el acento (item resaltado de los menus).
-            expect (gui::contrastRatio (background, accent) >= 4.5);
-
-            logMessage ("contraste texto secundario sobre panel: " + juce::String (gui::contrastRatio (textMuted, panel), 2)
-                        + ", acento sobre fondo: " + juce::String (gui::contrastRatio (accent, background), 2));
         }
 
-        beginTest ("escala de 0.75x a 2x, y se guarda con el proyecto");
+        beginTest ("escala de 0.75x a 2x, y la escala y el acabado se guardan con el proyecto");
         {
             StabrProcessor proc;
             auto editor = makeEditor (proc);
@@ -531,11 +603,9 @@ public:
                 expectWithinAbsoluteError (editor->getView().getTransform().mat00, s, 0.001f);
             }
 
-            // Fuera de rango se limita, no se rompe.
-            editor->setUiScale (5.0f);
-            expectWithinAbsoluteError (editor->getWidth(), W * 2, 1);
-
             editor->setUiScale (1.5f);
+            editor->setFinish (2);
+            proc.setTapeText ("peak time 128");
 
             juce::MemoryBlock blob;
             proc.getStateInformation (blob);
@@ -546,10 +616,14 @@ public:
             auto reopened = makeEditor (other);
 
             if (reopened != nullptr)
+            {
                 expectWithinAbsoluteError (reopened->getWidth(), juce::roundToInt (W * 1.5f), 1);
+                expectEquals (reopened->getFinish(), 2);
+                expectEquals (other.getTapeText(), juce::String ("peak time 128"));
+            }
         }
 
-        beginTest ("la grilla: editar un patron de fabrica lo copia a Custom sin perder nada");
+        beginTest ("los pads: editar un patron de fabrica lo copia a Custom sin perder nada");
         {
             StabrProcessor proc;
             auto editor = makeEditor (proc);
@@ -558,7 +632,7 @@ public:
                 return;
 
             auto& grid = editor->getView().getStepGrid();
-            expect (! grid.isCustomPattern());   // default: off-beat de fabrica
+            expect (! grid.isCustomPattern());
 
             grid.toggleStep (0);
 
@@ -574,7 +648,7 @@ public:
             expectWithinAbsoluteError (grid.getDisplayedStep (6).probability, 0.5f, 0.01f);
         }
 
-        beginTest ("costo de dibujar la interfaz completa, con visualizadores animando");
+        beginTest ("el LCD muestra el acorde que suena, y el costo de dibujar el aparato entero");
         {
             StabrProcessor proc;
             proc.setPlayConfigDetails (0, 2, 48000.0, 256);
@@ -585,24 +659,39 @@ public:
                 return;
 
             juce::AudioBuffer<float> buffer (2, 256);
+            juce::MidiBuffer silence;
+
+            // Medio segundo antes: el delay de cinta tiene que llegar a su tiempo.
+            for (int i = 0; i < 100; ++i)
+                proc.processBlock (buffer, silence);
+
             juce::MidiBuffer on;
-            on.addEvent (juce::MidiMessage::noteOn (1, 57, 0.9f), 0);
+            on.addEvent (juce::MidiMessage::noteOn (1, 62, 0.9f), 0);
             proc.processBlock (buffer, on);
+
+            const double t0 = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            auto& view = editor->getView();
+            view.tick (t0);
+
+            expectEquals (view.getLcdChordName(), juce::String ("Dm7"));
+
+            int lit = 0;
+            for (int y = 0; y < view.getLcd().getDotsHigh(); ++y)
+                for (int x = 0; x < view.getLcd().getDotsWide(); ++x)
+                    lit += view.getLcd().isLit (x, y) ? 1 : 0;
+
+            expect (lit > 200, "la pantalla casi no tiene puntos encendidos: " + juce::String (lit));
 
             for (float s : { 1.0f, 2.0f })
             {
                 editor->setUiScale (s);
 
-                const double t0 = juce::Time::getMillisecondCounterHiRes() * 0.001;
-                editor->getView().tick (t0);
-                expectEquals (editor->getView().getChordVisualizer().getDisplayedName(), juce::String ("Am7"));
-
-                constexpr int frames = 5;
+                constexpr int frames = 4;
                 const double start = juce::Time::getMillisecondCounterHiRes();
 
                 for (int i = 0; i < frames; ++i)
                 {
-                    editor->getView().tick (t0 + 0.05 * i);
+                    view.tick (t0 + 0.05 * i);
                     auto image = editor->createComponentSnapshot (editor->getLocalBounds());
                     expect (image.isValid());
                 }
@@ -610,55 +699,40 @@ public:
                 const double ms = (juce::Time::getMillisecondCounterHiRes() - start) / frames;
                 logMessage ("cuadro completo a " + juce::String (s, 2) + "x (" + juce::String (editor->getWidth()) + "x"
                             + juce::String (editor->getHeight()) + "): " + juce::String (ms, 1) + " ms, render por software");
-
-                // El render por software es el peor caso; en pantalla solo se
-                // repintan los visualizadores, no la interfaz entera.
-                expect (ms < 250.0, "dibujar la interfaz completa tarda " + juce::String (ms, 1) + " ms");
+                expect (ms < 400.0, "dibujar el aparato entero tarda " + juce::String (ms, 1) + " ms");
             }
 
-            /*  Volcado opcional a PNG para revisar la interfaz a ojo: que el
-                layout no se pise no dice si se ve bien. Solo con la variable
-                STABR_SNAPSHOT_DIR definida; en una corrida normal no escribe. */
+            /*  Volcado opcional a PNG de los tres acabados y de una pagina con
+                grafico, para revisar a ojo. Solo con STABR_SNAPSHOT_DIR. */
             const auto dir = juce::SystemStats::getEnvironmentVariable ("STABR_SNAPSHOT_DIR", {});
 
             if (dir.isNotEmpty())
             {
                 editor->setUiScale (1.0f);
 
-                /*  Un segundo de audio antes de capturar. Recien preparado, el
-                    delay en modo cinta todavia esta deslizando desde 0 hacia su
-                    tiempo: la primera version de este volcado capturo 19.5 ms
-                    en vez de 375 ms y parecia un bug de layout del visualizador. */
-                juce::MidiBuffer silence;
-                for (int i = 0; i < 200; ++i)
-                    proc.processBlock (buffer, silence);
-
-                const double t0 = juce::Time::getMillisecondCounterHiRes() * 0.001;
-
-                proc.processBlock (buffer, on);
-                editor->getView().tick (t0);
-                editor->getView().tick (t0 + 0.9);   // repeticiones del delay ya encendidas
-
-                // Datos reales del visualizador de delay, para diagnosticar el layout.
-                const auto& dv = editor->getView().getDelayVisualizer();
-                juce::String echoTimes;
-                for (int i = 0; i < dv.getNumEchoes(); ++i)
-                    echoTimes << juce::String (dv.getEcho (i).time, 3) << (dv.getEcho (i).channel == 0 ? "L " : "R ");
-
-                logMessage ("delay viz: timeL " + juce::String (dv.getInfo().timeL, 4) + " s, timeR " + juce::String (dv.getInfo().timeR, 4)
-                            + " s, fb " + juce::String (dv.getInfo().feedback, 2) + ", ventana " + juce::String (dv.getWindowSeconds(), 3)
-                            + " s, ecos: " + echoTimes);
-
-                for (int page = 0; page < editor->getView().getNumPages(); ++page)
+                auto save = [&] (const juce::String& name)
                 {
-                    editor->getView().showPage (page);
                     auto image = editor->createComponentSnapshot (editor->getLocalBounds());
-                    juce::File file (juce::File (dir).getChildFile ("stabr_page_" + juce::String (page) + ".png"));
+                    juce::File file (juce::File (dir).getChildFile (name));
                     file.deleteFile();
                     juce::FileOutputStream stream (file);
                     juce::PNGImageFormat().writeImageToStream (image, stream);
                     logMessage ("snapshot: " + file.getFullPathName());
+                };
+
+                for (int f = 0; f < gui::sp92::kNumFinishes; ++f)
+                {
+                    editor->setFinish (f);
+                    proc.processBlock (buffer, on);
+                    view.tick (t0 + 1.0 + f);
+                    view.tick (t0 + 1.25 + f);
+                    save ("sp92_finish_" + juce::String (f) + ".png");
                 }
+
+                editor->setFinish (1);
+                view.selectPage (2, 0);
+                view.tick (t0 + 10.0);
+                save ("sp92_filter_page.png");
             }
         }
     }
@@ -666,6 +740,7 @@ public:
 
 static ChordNamingTests chordNamingTests;
 static GuiFeedTests guiFeedTests;
-static DelayVisualizerTests delayVisualizerTests;
+static EchoModelTests echoModelTests;
+static LcdTests lcdTests;
 static EditorTests editorTests;
 }

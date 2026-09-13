@@ -26,6 +26,11 @@ namespace state
     /*  Nombre del sonido cargado, para mostrarlo al reabrir el proyecto. */
     inline const juce::Identifier presetNameProperty { "preset_name" };
 
+    /*  Interfaz del SP-92: acabado, candados de Create STAB y texto de la cinta. */
+    inline const juce::Identifier uiFinishProperty { "ui_finish" };
+    inline const juce::Identifier uiLocksProperty  { "ui_locks" };
+    inline const juce::Identifier uiTapeProperty   { "ui_tape" };
+
     /*  Se llama en el hilo de mensajes, nunca en audio. Puede asignar memoria. */
     inline void migrate (juce::ValueTree& tree)
     {

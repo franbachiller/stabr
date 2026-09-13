@@ -31,7 +31,7 @@
 
 <p class="lang"><a href="STABR-Manual-ES.html">Leer en español</a></p>
 <h1>STABR</h1>
-<p>House &amp; techno stab machine &middot; by Narfbach &middot; User manual for version 0.7</p>
+<p>House &amp; techno stab machine &middot; by Narfbach &middot; User manual for version 0.8</p>
 
 <nav>
 <ol>
@@ -56,7 +56,7 @@
 
 <h2 id="install">2. Installation</h2>
 <ol>
-  <li>Run the installer <code>STABR-0.7.0-Windows-x64-Setup.exe</code> and follow the steps.</li>
+  <li>Run the installer <code>STABR-0.8.0-Windows-x64-Setup.exe</code> and follow the steps.</li>
   <li>The plugin is installed to <code>C:\Program Files\Common Files\VST3\STABR.vst3</code>, the standard VST3 folder every DAW scans.</li>
   <li>Open your DAW and rescan plugins if STABR doesn't appear. It is listed as an instrument by <strong>Narfbach</strong>.</li>
 </ol>
@@ -67,33 +67,44 @@
   <li>Load STABR on an instrument track.</li>
   <li>Press any key. You hear a minor seventh chord in A minor, the default key.</li>
   <li>Set <strong>Key</strong> and <strong>Scale</strong> to your song. Now every key you press gives a chord that belongs to it: you can't play a wrong chord.</li>
-  <li>Press <strong>CREATE STAB</strong>. You get a new, verified sound at the same loudness as before. Press again until one grabs you.</li>
-  <li>Turn on <strong>Seq On</strong> and press play in your DAW. STABR plays the off-beat by itself.</li>
+  <li>Press the big orange <strong>STAB</strong> pad. You get a new, verified sound at the same loudness as before. Press again until one grabs you.</li>
+  <li>Turn on <strong>&#9654; SEQ</strong> and press play in your DAW. STABR plays the off-beat by itself.</li>
 </ol>
 
 <h2 id="interface">4. The interface</h2>
-<img src="images/stabr-interface.png" alt="The STABR interface">
+<img src="images/stabr-interface.png" alt="The STABR SP-92 interface">
+<p>STABR looks and works like a piece of hardware: the <strong>SP-92</strong>, a chord stab sampler. Everything you see is a control.</p>
 
-<h3>Header</h3>
+<h3>Top strip</h3>
 <ul>
-  <li><strong>&lt; Preset &gt;</strong>: browse the 20 factory presets and your own. The list is grouped by style.</li>
-  <li><strong>Save</strong>: stores the current sound as a user preset.</li>
-  <li><strong>CREATE STAB</strong>: generates a new sound. See <a href="#create">Create STAB</a>.</li>
+  <li><strong>POWER</strong>: the setup menu. Pick the <strong>finish</strong> (Beige '87, Graphite '92 or Arctic '89), the <strong>interface size</strong> from 75&nbsp;% to 200&nbsp;%, or write on the tape. You can also drag the bottom-right corner. Finish and size are saved with your project.</li>
+  <li><strong>Disk drive</strong>: click the floppy to open the sound list, grouped by style. The disk colour tells the style: blue House, black Techno, red Rave, green World, yellow Bass, purple Atmos, cream for your own disks.</li>
+  <li><strong>&#9664; &#9654;</strong>: previous and next sound. <strong>Save</strong>: stores the current sound as a user disk.</li>
+</ul>
+
+<h3>Display, function keys and encoders</h3>
+<ul>
+  <li>The <strong>dot matrix display</strong> shows the sound name, the tempo and, on the CHORD page, the name of the chord you're actually hearing with its notes placed by pitch, so you can see the voicing and which note is in the bass.</li>
+  <li>The seven <strong>function keys</strong> open the pages: <strong>CHORD, OSC, FILTER, DELAY, REVERB, FX, PUMP</strong>. Press the lit key again to go to the next sub-page. Each page draws a graph of what it controls: waveform, filter response, echoes, reverb tail, saturation curve, pump shape.</li>
+  <li>The six <strong>encoders</strong> below control the six values on the bottom row of the display. When you turn any knob, the display shows its exact value for a moment.</li>
+</ul>
+
+<h3>Tone and Echo</h3>
+<ul>
+  <li><strong>Tone</strong>: the controls you touch the most. Cutoff, Resonance and Decay, plus Env Amt and Drive.</li>
+  <li><strong>Echo</strong>: the small display shows every echo in time (left to right) and in the stereo field (L on top, R below), and lights them up as they happen. Below: Time, Feedback and Mix, and the three mode keys <strong>Stereo, Ping, Dub</strong>.</li>
+  <li><strong>VU meter</strong>: output level.</li>
+</ul>
+
+<h3>Sequence, Create and Lock</h3>
+<ul>
+  <li><strong>16 pads</strong>: one row per beat. See <a href="#seq">the sequencer</a>.</li>
+  <li><strong>&#9654; SEQ</strong> turns the sequencer on; the <strong>Pattern</strong> switch picks the rhythm; <strong>Swing</strong>, <strong>Gate</strong> and <strong>Rate</strong> shape it.</li>
+  <li><strong>STAB</strong>: generates a new sound, and the knobs turn to it. See <a href="#create">Create STAB</a>.</li>
   <li><strong>Undo / Redo</strong>: step back and forth through sound changes (presets, Create STAB).</li>
-  <li><strong>LOCK Chord / FX / Seq</strong>: parts that Create STAB leaves untouched.</li>
-  <li><strong>Size</strong>: interface size from 75&nbsp;% to 200&nbsp;%. You can also drag the bottom-right corner. The size is saved with your project.</li>
-  <li><strong>Meter</strong>: output level, left and right.</li>
+  <li><strong>LOCK Chord / FX / Seq</strong>: flip a switch up to keep that part untouched by STAB.</li>
+  <li><strong>Output</strong>: output level. <strong>The tape</strong>: double-click it and write your track's name.</li>
 </ul>
-
-<h3>Main row (always visible)</h3>
-<ul>
-  <li><strong>Chord</strong>: chord type, key and scale, and the <em>chord display</em>. It shows the notes that are sounding, placed by pitch, so you can see the voicing and which note is in the bass. On top, the name of the chord you're actually hearing.</li>
-  <li><strong>Filter / Amp</strong>: the controls you touch the most. Cutoff, Resonance and Decay, plus the filter envelope amount and decay, and Drive.</li>
-  <li><strong>Delay</strong>: the delay display shows every echo in time (left to right) and in the stereo field (L on top, R below), and lights them up as they happen. Below: time, mode, feedback and mix.</li>
-</ul>
-
-<h3>Pages</h3>
-<p>Everything else lives in seven tabs: <strong>Chord, Osc, Filter, Delay, Reverb, FX, Pump / Out</strong>.</p>
 
 <h3>Handy gestures</h3>
 <table>
@@ -134,14 +145,14 @@
 <p><strong>Polyphony</strong> counts chords, not notes: how many stabs can overlap. <strong>Bend</strong> sets the pitch-bend range.</p>
 
 <h2 id="sound">6. Shaping the sound</h2>
-<h3>Oscillators (Osc tab)</h3>
+<h3>Oscillators (OSC page)</h3>
 <ul>
   <li><strong>Osc 1 and Osc 2</strong>: Saw, Pulse, Triangle, Organ (an M1-style organ) or Sine. Osc 2 adds Detune and Octave.</li>
   <li><strong>PW</strong>: pulse width, for the Pulse wave.</li>
   <li><strong>Sub</strong>: an extra oscillator one or two octaves below.</li>
   <li><strong>Unison</strong>: up to 7 detuned copies per note, spread across the stereo field. Rnd Phase randomizes where each copy starts.</li>
 </ul>
-<h3>Filter (main row and Filter tab)</h3>
+<h3>Filter (Tone section and FILTER page)</h3>
 <ul>
   <li><strong>Type</strong> Low Pass, Band Pass, High Pass, and <strong>Slope</strong> 12 or 24 dB/oct.</li>
   <li><strong>Resonance</strong> can self-oscillate at the top of its range, safely.</li>
@@ -178,7 +189,7 @@
 </ul>
 
 <h2 id="seq">8. The sequencer</h2>
-<p>Turn on <strong>Seq On</strong> and press play in your DAW: STABR plays the pattern by itself, perfectly in time. It follows your transport. It starts, stops, loops and jumps with it, and a render sounds exactly like playback.</p>
+<p>Turn on <strong>&#9654; SEQ</strong> and press play in your DAW: STABR plays the pattern by itself, perfectly in time. It follows your transport. It starts, stops, loops and jumps with it, and a render sounds exactly like playback.</p>
 
 <h3>What it plays (latch)</h3>
 <ul>
@@ -235,7 +246,7 @@
 <h3>Dub techno</h3>
 <p>Load <em>Dub Techno Chord</em>, or build it: Min7 with Density 3, Cutoff around 750&nbsp;Hz with Env Amount near 60&nbsp;%, Delay Mode <strong>Dub</strong> at <strong>1/8.</strong> with Feedback 65&nbsp;% and LP around 3&nbsp;kHz, Reverb <strong>Hall</strong> with Mix 30&nbsp;%. Play one key every two bars and let it dissolve. Hit <strong>Freeze</strong> at the peak.</p>
 <h3>Garage groove</h3>
-<p>Organ wave, Min9, Seq On with <em>Skippy 16ths</em>, Swing about 60&nbsp;%, Gate 35&nbsp;%, a short ping-pong delay.</p>
+<p>Organ wave, Min9, &#9654; SEQ on with <em>Skippy 16ths</em>, Swing about 60&nbsp;%, Gate 35&nbsp;%, a short ping-pong delay.</p>
 <h3>Club safety</h3>
 <p>Keep <strong>Mono Below</strong> at 120&nbsp;Hz or higher and the <strong>Limiter</strong> on. Use <strong>Pump</strong> on quarter notes if you don't have a sidechain set up.</p>
 
@@ -243,10 +254,10 @@
 <table>
   <tr><th>Problem</th><th>Solution</th></tr>
   <tr><td>STABR doesn't appear in my DAW</td><td>Rescan plugins and check that <code>C:\Program Files\Common Files\VST3</code> is in your DAW's VST3 folders.</td></tr>
-  <tr><td>With Seq On, pressing keys doesn't trigger sound</td><td>That's by design while the transport is running: keys choose the chord and the pattern plays it. Stop the transport to play live.</td></tr>
+  <tr><td>With &#9654; SEQ on, pressing keys doesn't trigger sound</td><td>That's by design while the transport is running: keys choose the chord and the pattern plays it. Stop the transport to play live.</td></tr>
   <tr><td>Everything sounds slightly late</td><td>You're in Note Mode <strong>Auto</strong>, which needs 20&nbsp;ms to detect chords. Your DAW compensates it; for live playing use <strong>Chord</strong> or <strong>Passthrough</strong>.</td></tr>
   <tr><td>High CPU</td><td>Drive and unison are the costliest settings, and HQ Mode much more. Lower Polyphony or turn HQ Mode off while producing.</td></tr>
-  <tr><td>Create STAB did nothing</td><td>It ignores clicks while a sound is being generated. Wait until the button reads CREATE STAB again.</td></tr>
+  <tr><td>Create STAB did nothing</td><td>It ignores clicks while a sound is being generated. Wait until the display stops showing CREATING.</td></tr>
 </table>
 
 <h2 id="specs">12. Specifications</h2>

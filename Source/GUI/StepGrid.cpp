@@ -1,5 +1,6 @@
 #include "StepGrid.h"
-#include "Palette.h"
+#include "SP92/Sp92LookAndFeel.h"
+#include "SP92/Sp92Fonts.h"
 #include "../Params/ParameterIDs.h"
 
 namespace stabr::gui
@@ -52,51 +53,93 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        using namespace colours;
+        const auto& f = sp92::currentFinish (*this);
+        const float size = (float) StepGrid::kPadSize;
+        const bool down = playing || isMouseButtonDown();
+        const auto face = juce::Rectangle<float> (0.0f, down ? 3.0f : 0.0f, size, size);
 
-        auto b = getLocalBounds().toFloat().reduced (1.5f);
-        const float dim = inLength ? 1.0f : 0.35f;
+        if (! inLength)
+            g.beginTransparencyLayer (0.4f);
 
-        g.setColour ((index % 4 == 0 ? raised.brighter (0.06f) : raised).withMultipliedAlpha (dim));
-        g.fillRoundedRectangle (b, 3.0f);
+        if (! down)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.15f));
+            g.fillRoundedRectangle (face.translated (0.0f, 6.0f).expanded (1.0f), 10.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            g.fillRoundedRectangle (face.translated (0.0f, 4.0f), 9.0f);
+        }
+
+        if (step.on || playing)
+        {
+            const float glow = playing ? 0.6f : 0.35f * (0.4f + 0.6f * step.velocity);
+            g.setColour (f.led.withAlpha (glow * 0.5f));
+            g.fillRoundedRectangle (face.expanded (5.0f), 13.0f);
+        }
+
+        juce::ColourGradient rubber (f.padHi, face.getX(), face.getY(), f.padLo, face.getRight(), face.getBottom(), false);
+        rubber.addColour (0.55, f.pad);
+        g.setGradientFill (rubber);
+        g.fillRoundedRectangle (face, 9.0f);
+
+        juce::ColourGradient shade (juce::Colours::transparentBlack, 0.0f, face.getCentreY(),
+                                    juce::Colours::black.withAlpha (0.35f), 0.0f, face.getBottom(), false);
+        g.setGradientFill (shade);
+        g.fillRoundedRectangle (face, 9.0f);
+
+        g.setColour (juce::Colours::white.withAlpha (0.16f));
+        g.drawLine (face.getX() + 9.0f, face.getY() + 1.0f, face.getRight() - 9.0f, face.getY() + 1.0f, 1.0f);
+
+        if (step.on || playing)
+        {
+            g.setColour (f.led.withAlpha (playing ? 1.0f : 0.55f));
+            g.drawRoundedRectangle (face.expanded (1.0f), 10.0f, 2.0f);
+        }
+
+        // LED del paso: brillo segun la velocity.
+        const juce::Rectangle<float> led { face.getRight() - 14.0f, face.getY() + 7.0f, 7.0f, 7.0f };
 
         if (step.on)
         {
-            auto inner = b.reduced (3.0f);
-            const float h = inner.getHeight() * juce::jlimit (0.12f, 1.0f, step.velocity);
-            g.setColour ((playing ? accent : accent.withAlpha (0.55f)).withMultipliedAlpha (dim));
-            g.fillRoundedRectangle (inner.removeFromBottom (h), 2.0f);
-
-            auto marks = b.reduced (4.0f).removeFromTop (12.0f);
-
-            // Ratchet: una marca por disparo.
-            if (step.ratchet > 1)
-            {
-                g.setColour (text.withMultipliedAlpha (dim));
-
-                for (int k = 0; k < step.ratchet; ++k)
-                    g.fillRect (marks.getX() + (float) k * 5.0f, marks.getY(), 3.0f, 3.0f);
-            }
-
-            if (step.probability < 0.999f)
-            {
-                g.setColour (text.withMultipliedAlpha (dim));
-                g.setFont (fonts::value (10.5f));
-                g.drawText (juce::String (juce::roundToInt (step.probability * 100.0f)),
-                            marks.withTrimmedTop (2.0f), juce::Justification::centredRight, false);
-            }
+            const float brightness = 0.35f + 0.65f * juce::jlimit (0.0f, 1.0f, step.velocity);
+            g.setColour (f.led.withAlpha (0.4f * brightness));
+            g.fillEllipse (led.expanded (3.0f));
+            g.setColour (f.led.withAlpha (brightness));
         }
-
-        if (playing)
+        else
         {
-            g.setColour (accent);
-            g.drawRoundedRectangle (b, 3.0f, 2.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
         }
+
+        g.fillEllipse (led);
+
+        g.setFont (sp92::fonts::label (9.0f));
+        g.setColour (juce::Colours::white.withAlpha (0.28f));
+        g.drawText (juce::String (index + 1), juce::Rectangle<float> (face.getX() + 6.0f, face.getBottom() - 15.0f, 20.0f, 12.0f),
+                    juce::Justification::centredLeft, false);
+
+        if (step.on && step.probability < 0.999f)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
+            g.drawText (juce::String (juce::roundToInt (step.probability * 100.0f)),
+                        juce::Rectangle<float> (face.getRight() - 28.0f, face.getBottom() - 15.0f, 22.0f, 12.0f),
+                        juce::Justification::centredRight, false);
+        }
+
+        if (step.on && step.ratchet > 1)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.6f));
+
+            for (int k = 0; k < step.ratchet; ++k)
+                g.fillEllipse (face.getX() + 7.0f + (float) k * 6.0f, face.getY() + 8.0f, 3.5f, 3.5f);
+        }
+
+        if (! inLength)
+            g.endTransparencyLayer();
 
         if (hasKeyboardFocus (false))
         {
-            g.setColour (text);
-            g.drawRoundedRectangle (b.reduced (1.0f), 3.0f, 1.2f);
+            g.setColour (f.stripInk.withAlpha (0.9f));
+            g.drawRoundedRectangle (face.expanded (3.0f), 11.0f, 1.2f);
         }
     }
 
@@ -116,6 +159,7 @@ public:
             owner.toggleStep (index);
 
         dragStartVelocity = owner.getDisplayedStep (index).velocity;
+        repaint();
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -136,6 +180,8 @@ public:
     {
         if (! e.mods.isPopupMenu() && turnOffOnRelease && ! dragged)
             owner.toggleStep (index);
+
+        repaint();
     }
 
     bool keyPressed (const juce::KeyPress& key) override
@@ -224,6 +270,7 @@ private:
 StepGrid::StepGrid (juce::AudioProcessorValueTreeState& state) : apvts (state)
 {
     setTitle ("Sequencer steps");
+    setInterceptsMouseClicks (false, true);
 
     for (int i = 0; i < seq::kNumSteps; ++i)
     {
@@ -238,20 +285,8 @@ StepGrid::~StepGrid() = default;
 
 void StepGrid::resized()
 {
-    // Separacion extra cada 4 pasos: se lee el compas de un vistazo.
-    constexpr float gap = 3.0f, groupGap = 8.0f;
-
-    juce::FlexBox fb;
-    fb.flexDirection = juce::FlexBox::Direction::row;
-    fb.alignItems = juce::FlexBox::AlignItems::stretch;
-
     for (int i = 0; i < seq::kNumSteps; ++i)
-    {
-        const float right = i + 1 == seq::kNumSteps ? 0.0f : ((i + 1) % 4 == 0 ? groupGap : gap);
-        fb.items.add (juce::FlexItem (*cells[(size_t) i]).withFlex (1.0f).withMargin (juce::FlexItem::Margin (0.0f, right, 0.0f, 0.0f)));
-    }
-
-    fb.performLayout (getLocalBounds());
+        cells[(size_t) i]->setBounds (kInset + (i % 4) * kPadPitch, kInset + (i / 4) * kPadPitch, kPadSize, kPadSize + 5);
 }
 
 bool StepGrid::isCustomPattern() const
