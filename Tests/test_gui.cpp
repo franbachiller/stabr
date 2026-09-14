@@ -1147,6 +1147,32 @@ public:
             expect (playing.isLit (x1 + 1, lcdraw::EchoScreen::laneL - 1), "la repeticion que suena no se enciende");
         }
 
+        beginTest ("el nombre del acorde nunca pisa el teclado");
+        {
+            DotMatrix m (190, 72);
+            const std::pair<const char*, chord::ChordResult> cases[]
+            {
+                { "G#m9",     chordOf ({ 56, 59, 63, 66, 70 }) },
+                { "F B E",    chordOf ({ 41, 59, 76 }) },           // sin nombre, voicing abierto (3 octavas)
+                { "C#m7b5/G", chordOf ({ 43, 49, 52, 59 }) },
+                { "Am7",      chordOf ({ 36, 60, 76, 83 }) },       // 4 octavas
+            };
+
+            for (const auto& [chordName, notes] : cases)
+            {
+                const auto k = lcdraw::keyboardFor (notes, 82, 189, 13);
+                const int scale = lcdraw::fitTextScale (m, chordName, k.x - 4 - 2);
+                const int right = 2 + m.textWidth (chordName, scale) - 1;
+
+                logMessage (juce::String (chordName) + ": x" + juce::String (scale) + ", termina en " + juce::String (right)
+                            + ", el teclado empieza en " + juce::String (k.x));
+                expect (right + 4 < k.x, juce::String (chordName) + " pisa el teclado");
+            }
+
+            expectEquals (lcdraw::fitTextScale (m, "G#m9", 80), 3);
+            expectEquals (lcdraw::fitTextScale (m, "F B E", 77), 2);
+        }
+
         beginTest ("columnas del LCD: siempre con aire y dentro de la pantalla");
         {
             juce::Random rng (0x5AB);

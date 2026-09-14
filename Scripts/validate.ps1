@@ -116,4 +116,31 @@ if ($code -eq 0) {
     Write-Host "pluginval FALLO (exit $code)." -ForegroundColor Red
 }
 
-exit $code
+# Chequeo de descarga (D-053): un host minimo carga el VST3, abre y cierra el
+# editor, libera la instancia y descarga la DLL, como un DAW al cerrar. Si no
+# termina, el plugin cuelga al DAW al cerrar (FL Studio se colgaba asi).
+$unloadCode = 0
+$unloadHost = Join-Path $buildDir "Tests\STABR_UnloadCheck_artefacts\$Config\STABR_UnloadCheck.exe"
+
+Write-Host ''
+if (Test-Path $unloadHost) {
+    Write-Host 'Chequeo de descarga: abrir, cerrar y descargar el plugin...'
+    $unload = Start-Process -FilePath $unloadHost -ArgumentList "`"$($vst3.FullName)`"" -PassThru -NoNewWindow
+    $null = $unload.Handle   # sin esto ExitCode queda vacio
+
+    if (-not $unload.WaitForExit(60000)) {
+        Stop-Process -Id $unload.Id -Force
+        Write-Host 'Descarga COLGADA: el plugin no termino en 60 s (ver DECISIONS.md D-053).' -ForegroundColor Red
+        $unloadCode = 1
+    } elseif ($unload.ExitCode -ne 0) {
+        Write-Host "Descarga FALLO (exit $($unload.ExitCode))." -ForegroundColor Red
+        $unloadCode = $unload.ExitCode
+    } else {
+        Write-Host 'Descarga OK: sin cuelgues al cerrar.' -ForegroundColor Green
+    }
+} else {
+    Write-Host "No esta $unloadHost. Compila el target STABR_UnloadCheck para chequear la descarga." -ForegroundColor Yellow
+}
+
+if ($code -ne 0) { exit $code }
+exit $unloadCode

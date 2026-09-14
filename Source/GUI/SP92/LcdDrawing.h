@@ -16,6 +16,10 @@ namespace stabr::gui::sp92::lcdraw
     ("SCALEVOICE"), con el mayor aire que entre en la pantalla. */
 std::array<int, 6> layoutCells (const std::array<int, 6>& widths, int screenWidth);
 
+/*  El tamano de letra mas grande (maxScale..1) con el que el texto entra en
+    maxWidth puntos. El nombre del acorde no puede pisar el teclado. */
+int fitTextScale (const DotMatrix&, const juce::String&, int maxWidth, int maxScale = 3);
+
 //==============================================================================
 /*  Teclado del acorde: 2 a 4 octavas segun lo abierto del voicing, las teclas
     que suenan encendidas y los nombres de las notas debajo, del bajo al agudo. */

@@ -35,6 +35,27 @@ if(MSVC)
     target_link_options(STABR_Tests PRIVATE /STACK:16777216)
 endif()
 
+# ---------------------------------------------------------------------------
+# Host minimo que carga el VST3, abre y cierra el editor, libera la instancia y
+# descarga la DLL, como un DAW al cerrar. Detecta cuelgues al descargar el
+# plugin (FL Studio se colgaba al cerrar, D-053). No linkea STABR: lo carga como
+# cualquier host, desde el .vst3 compilado.
+# ---------------------------------------------------------------------------
+juce_add_console_app(STABR_UnloadCheck PRODUCT_NAME "STABR Unload Check")
+target_sources(STABR_UnloadCheck PRIVATE unload_check.cpp)
+target_compile_definitions(STABR_UnloadCheck PRIVATE
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_MODAL_LOOPS_PERMITTED=1
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+target_link_libraries(STABR_UnloadCheck PRIVATE
+    juce::juce_audio_processors
+    juce::juce_gui_extra
+    juce::juce_recommended_config_flags
+)
+add_dependencies(STABR_UnloadCheck STABR_VST3)
+
 if(WIN32)
     target_compile_definitions(STABR_Tests PRIVATE _CONSOLE=1)
     set_target_properties(STABR_Tests PROPERTIES WIN32_EXECUTABLE FALSE)

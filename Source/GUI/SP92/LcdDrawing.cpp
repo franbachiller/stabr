@@ -53,6 +53,15 @@ std::array<int, 6> layoutCells (const std::array<int, 6>& widths, int screenWidt
     return left;
 }
 
+int fitTextScale (const DotMatrix& lcd, const juce::String& text, int maxWidth, int maxScale)
+{
+    for (int scale = juce::jmax (1, maxScale); scale > 1; --scale)
+        if (lcd.textWidth (text, scale) <= maxWidth)
+            return scale;
+
+    return 1;
+}
+
 //==============================================================================
 bool isBlackKey (int midiNote) noexcept
 {

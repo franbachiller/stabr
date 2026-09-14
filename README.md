@@ -19,7 +19,9 @@ Inno Setup, y la interfaz nueva: un sampler de 1992 con tres acabados.
 
 Build limpio sin warnings, tests en verde, y **pluginval strictness 10 en
 SUCCESS** sobre 6 sample rates (44.1 a 192 kHz) × 7 tamaños de buffer (32 a
-2048), con 163 parámetros.
+2048), con 163 parámetros. Cada validación además carga el plugin en un host
+mínimo, abre y cierra el editor y lo descarga: ningún cuelgue al cerrar el DAW
+([D-053](DECISIONS.md)).
 
 ### La interfaz: STABR SP-92
 

@@ -1,4 +1,5 @@
 #include "Sp92LookAndFeel.h"
+#include "Sp92Assets.h"
 #include "Sp92Fonts.h"
 #include "Anim.h"
 
@@ -59,7 +60,7 @@ namespace
         tamano fisico y despues solo rotado. */
     const juce::Image& metalCap (int sizePx)
     {
-        static std::map<int, juce::Image> cache;
+        auto& cache = Sp92Assets::get().metalCaps;   // no estatico: ver D-053
 
         if (cache.size() > 48)
             cache.clear();
@@ -69,7 +70,7 @@ namespace
         if (img.isValid())
             return img;
 
-        img = juce::Image (juce::Image::ARGB, sizePx, sizePx, true);
+        img = juce::Image (juce::Image::ARGB, sizePx, sizePx, true, juce::SoftwareImageType());
         juce::Graphics g (img);
 
         const juce::Colour stops[] { juce::Colour (0xffe9e7e2), juce::Colour (0xff9b9994), juce::Colour (0xfff3f1ec), juce::Colour (0xff8a8883),

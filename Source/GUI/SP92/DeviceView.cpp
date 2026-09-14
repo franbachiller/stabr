@@ -583,8 +583,12 @@ void DeviceView::drawMainLcd (double now)
         }
 
         shownChordName = chordNameFor (notes);
-        const int scale = shownChordName.length() > 5 ? 2 : 3;
-        lcd.text (shownChordName, 2, scale == 3 ? 15 : 19, scale);
+
+        // El nombre usa la letra mas grande que entra antes del teclado, con 4
+        // puntos de aire: "F B E" o "C#m7b5/G" bajan de tamano en vez de pisarlo.
+        const auto keys = lcdraw::keyboardFor (notes, 82, 189, 13);
+        const int scale = lcdraw::fitTextScale (lcd, shownChordName, keys.x - 4 - 2);
+        lcd.text (shownChordName, 2, scale == 3 ? 15 : (scale == 2 ? 19 : 22), scale);
 
         juce::String detail;
         if (auto* voicing = apvts.getParameter (pid::chordVoicing))

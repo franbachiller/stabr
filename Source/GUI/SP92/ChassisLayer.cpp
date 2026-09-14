@@ -1,4 +1,5 @@
 #include "ChassisLayer.h"
+#include "Sp92Assets.h"
 #include "Anim.h"
 #include "Hardware.h"
 #include "Sp92Fonts.h"
@@ -15,9 +16,11 @@ namespace
         aparato se ve igual cada vez que se abre. */
     const juce::Image& noiseTile()
     {
-        static const juce::Image tile = []
+        auto& tile = Sp92Assets::get().noiseTile;   // no estatico: ver D-053
+
+        if (! tile.isValid())
         {
-            juce::Image img (juce::Image::ARGB, 180, 180, true);
+            juce::Image img (juce::Image::ARGB, 180, 180, true, juce::SoftwareImageType());
             std::mt19937 rng (0x57AB);
             std::uniform_int_distribution<int> dist (-32, 32);
 
@@ -28,8 +31,8 @@ namespace
                     img.setPixelAt (x, y, (v >= 0 ? juce::Colours::white : juce::Colours::black).withAlpha ((juce::uint8) (std::abs (v) * 0.8f)));
                 }
 
-            return img;
-        }();
+            tile = img;
+        }
 
         return tile;
     }

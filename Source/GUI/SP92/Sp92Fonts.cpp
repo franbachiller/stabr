@@ -1,4 +1,5 @@
 #include "Sp92Fonts.h"
+#include "Sp92Assets.h"
 
 #if STABR_HAS_EMBEDDED_FONTS
  #include <BinaryData.h>
@@ -20,10 +21,19 @@ namespace
         return juce::Typeface::createSystemTypefaceFor (data, (size_t) size);
     }
 
-    juce::Typeface::Ptr michroma()      { static auto t = load (BinaryData::MichromaRegular_ttf, BinaryData::MichromaRegular_ttfSize); return t; }
-    juce::Typeface::Ptr archivo600()    { static auto t = load (BinaryData::ArchivoNarrowSemiBold_ttf, BinaryData::ArchivoNarrowSemiBold_ttfSize); return t; }
-    juce::Typeface::Ptr archivo700()    { static auto t = load (BinaryData::ArchivoNarrowBold_ttf, BinaryData::ArchivoNarrowBold_ttfSize); return t; }
-    juce::Typeface::Ptr reenieBeanie()  { static auto t = load (BinaryData::ReenieBeanieRegular_ttf, BinaryData::ReenieBeanieRegular_ttfSize); return t; }
+    // En Sp92Assets y no en estaticos: ver D-053.
+    juce::Typeface::Ptr cached (juce::Typeface::Ptr& slot, const char* data, int size)
+    {
+        if (slot == nullptr)
+            slot = load (data, size);
+
+        return slot;
+    }
+
+    juce::Typeface::Ptr michroma()      { return cached (Sp92Assets::get().michroma, BinaryData::MichromaRegular_ttf, BinaryData::MichromaRegular_ttfSize); }
+    juce::Typeface::Ptr archivo600()    { return cached (Sp92Assets::get().archivo600, BinaryData::ArchivoNarrowSemiBold_ttf, BinaryData::ArchivoNarrowSemiBold_ttfSize); }
+    juce::Typeface::Ptr archivo700()    { return cached (Sp92Assets::get().archivo700, BinaryData::ArchivoNarrowBold_ttf, BinaryData::ArchivoNarrowBold_ttfSize); }
+    juce::Typeface::Ptr reenieBeanie()  { return cached (Sp92Assets::get().reenieBeanie, BinaryData::ReenieBeanieRegular_ttf, BinaryData::ReenieBeanieRegular_ttfSize); }
 
     juce::Font make (juce::Typeface::Ptr tf, float px, float em)
     {

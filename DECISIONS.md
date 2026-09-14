@@ -1185,3 +1185,44 @@ punto por punto. Teclas encendidas y apagadas en Dm7, negras que suenan
 llenas, 3 y 4 octavas, nombres "D F A C", una barra por repetición en su
 canal, la primera más alta que la tercera, la repetición que suena duplicada,
 y 5000 combinaciones de columnas con al menos 3 puntos de aire.
+
+## D-053 · Fase 8 · FL Studio se colgaba al cerrar: estáticos de JUCE
+
+**Reporte del usuario:** "FL crashea siempre al cerrarlo cada vez que abro
+STABR". Además, el nombre del acorde ("F B E") se encimaba sobre el teclado.
+
+**Diagnóstico con datos.**
+
+- **No era un crash, era un cuelgue.** En el registro de Windows de ese día no
+  hay errores de aplicación de FL: hay `AppHangB1` ("FL64.exe dejó de
+  interactuar con Windows y se cerró") a las 18:32 y a las 19:18.
+- **Reproducción:** `STABR_UnloadCheck` (Tests/unload_check.cpp) es un host
+  mínimo. Carga el VST3, abre y cierra el editor dos veces, libera la
+  instancia y descarga la DLL. Con el código de ese momento no terminó en
+  90 s: se colgaba al destruir la instancia, que es cuando el plugin apaga
+  su copia de JUCE (el wrapper VST3 tiene un `ScopedJuceInitialiser_GUI`
+  por instancia).
+- **Causa:** la Fase 8 agregó variables estáticas con objetos de JUCE que
+  viven más que JUCE:
+  - las cuatro `Typeface::Ptr` embebidas;
+  - el caché de imágenes del aluminio de las perillas;
+  - la textura del plástico (las dos, imágenes nativas de Direct2D).
+
+  JUCE se bloqueaba al apagarse con esos recursos todavía retenidos.
+
+**Solución:**
+
+- Los recursos compartidos viven en `Sp92Assets`, un `DeletedAtShutdown`
+  que JUCE libera al empezar su apagado. No quedan estáticos con objetos de
+  JUCE en la GUI.
+- Las dos imágenes cacheadas pasan a ser de software: no dependen del
+  dispositivo Direct2D.
+- **Verificado:** con el arreglo, el mismo host libera la instancia en 26 ms,
+  descarga la DLL y sale con código 0. El chequeo quedó en
+  `Scripts/validate.ps1`, después de pluginval, con límite de tiempo.
+
+**Nombre del acorde sobre el teclado.** Se dibujaba a 3x si tenía hasta 5
+caracteres, y "F B E" (tres notas sin nombre de acorde) a 3x mide 87 puntos:
+pisaba un teclado de 3 octavas que empieza en el punto 83. Ahora usa la letra
+más grande que entra antes del teclado con 4 puntos de aire (3x, 2x o 1x).
+Un test lo verifica con "G#m9", "F B E", "C#m7b5/G" y un voicing de 4 octavas.
