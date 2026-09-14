@@ -526,6 +526,138 @@ public:
             expectEquals (problems, 0);
         }
 
+        beginTest ("nada visible se toca: cada pieza tiene al menos 3.5 px de aire");
+        {
+            auto procPtr = std::make_unique<StabrProcessor>();
+            auto& proc = *procPtr;
+            auto editor = makeEditor (proc);
+
+            if (editor == nullptr)
+                return;
+
+            using Item = gui::sp92::DeviceView::VisualItem;
+            const auto items = editor->getView().getVisualItems();
+
+            auto pointToRect = [] (juce::Rectangle<float> r, juce::Point<float> p)
+            {
+                const float dx = juce::jmax (r.getX() - p.x, 0.0f, p.x - r.getRight());
+                const float dy = juce::jmax (r.getY() - p.y, 0.0f, p.y - r.getBottom());
+                return std::hypot (dx, dy);
+            };
+
+            auto gap = [&] (const Item& a, const Item& b)
+            {
+                if (a.round && b.round)
+                    return a.area.getCentre().getDistanceFrom (b.area.getCentre()) - (a.area.getWidth() + b.area.getWidth()) * 0.5f;
+
+                if (a.round || b.round)
+                {
+                    const auto& circle = a.round ? a : b;
+                    const auto& box = a.round ? b : a;
+                    return pointToRect (box.area, circle.area.getCentre()) - circle.area.getWidth() * 0.5f;
+                }
+
+                const float dx = juce::jmax (a.area.getX() - b.area.getRight(), b.area.getX() - a.area.getRight());
+                const float dy = juce::jmax (a.area.getY() - b.area.getBottom(), b.area.getY() - a.area.getBottom());
+
+                if (dx > 0.0f && dy > 0.0f)
+                    return std::hypot (dx, dy);
+
+                return juce::jmax (dx, dy);
+            };
+
+            int problems = 0;
+            float tightest = 1.0e6f;
+            juce::String tightestPair;
+
+            for (size_t i = 0; i < items.size(); ++i)
+                for (size_t j = i + 1; j < items.size(); ++j)
+                {
+                    const auto& a = items[i];
+                    const auto& b = items[j];
+
+                    // Lo que va adentro de otra pieza (pantalla en su marco, pads en su pozo).
+                    if (a.area.contains (b.area) || b.area.contains (a.area))
+                        continue;
+
+                    const float g = gap (a, b);
+
+                    if (g < tightest)
+                    {
+                        tightest = g;
+                        tightestPair = a.name + " / " + b.name;
+                    }
+
+                    if (g < 3.5f)
+                    {
+                        ++problems;
+                        expect (false, "'" + a.name + "' y '" + b.name + "' a " + juce::String (g, 1) + " px");
+                    }
+                }
+
+            logMessage ("piezas visibles: " + juce::String ((int) items.size()) + ", separacion minima "
+                        + juce::String (tightest, 1) + " px (" + tightestPair + ")");
+            expectEquals (problems, 0);
+        }
+
+        beginTest ("la pantalla: puntos cuadrados, identicos y centrados");
+        {
+            gui::sp92::DotMatrix m (190, 72);
+            m.setSize (524, 196);
+
+            const auto first = m.getDotRect (0, 0);
+            const auto lastDot = m.getDotRect (189, 71);
+            expectWithinAbsoluteError (first.getWidth(), first.getHeight(), 1.0e-4f);
+            expectWithinAbsoluteError (first.getWidth(), lastDot.getWidth(), 1.0e-4f);
+
+            const auto grid = m.getGridArea();
+            expectWithinAbsoluteError (grid.getCentreX(), 262.0f, 0.01f);
+            expectWithinAbsoluteError (grid.getCentreY(), 98.0f, 0.01f);
+
+            // Un punto encendido pintado a una escala rara (125 %) pone la misma
+            // cantidad de tinta (alfa de la capa de puntos, sin el vidrio) en
+            // cualquier lugar de la pantalla: nada de redondeos por posicion.
+            auto alphaSum = [] (gui::sp92::DotMatrix& dots)
+            {
+                juce::Image img (juce::Image::ARGB, 655, 245, true, juce::SoftwareImageType());
+                {
+                    juce::Graphics g (img);
+                    g.addTransform (juce::AffineTransform::scale (1.25f));
+                    dots.paintEntireComponent (g, false);
+                }
+
+                const auto& layer = dots.getDotLayer();
+                double total = 0.0;
+                for (int py = 0; py < layer.getHeight(); ++py)
+                    for (int px = 0; px < layer.getWidth(); ++px)
+                        total += layer.getPixelAt (px, py).getFloatAlpha();
+
+                return total;
+            };
+
+            gui::sp92::DotMatrix blank (190, 72);
+            blank.setSize (524, 196);
+            blank.commit();
+            const double base = alphaSum (blank);
+
+            auto lightOf = [&] (int x, int y)
+            {
+                gui::sp92::DotMatrix dots (190, 72);
+                dots.setSize (524, 196);
+                dots.set (x, y);
+                dots.commit();
+                return alphaSum (dots) - base;
+            };
+
+            const double a = lightOf (10, 10), b = lightOf (11, 10), c = lightOf (100, 40), d = lightOf (157, 63);
+            logMessage ("luz de un punto en cuatro lugares: " + juce::String (a, 2) + ", " + juce::String (b, 2) + ", "
+                        + juce::String (c, 2) + ", " + juce::String (d, 2));
+            expect (a > 1.0);
+            expectWithinAbsoluteError (b / a, 1.0, 0.03);
+            expectWithinAbsoluteError (c / a, 1.0, 0.03);
+            expectWithinAbsoluteError (d / a, 1.0, 0.03);
+        }
+
         beginTest ("accesibilidad: todo control tiene nombre y se alcanza con teclado");
         {
             StabrProcessor proc;
@@ -693,17 +825,21 @@ public:
 
                 constexpr int frames = 4;
                 const double start = juce::Time::getMillisecondCounterHiRes();
+                juce::String perFrame;
 
                 for (int i = 0; i < frames; ++i)
                 {
+                    const double f0 = juce::Time::getMillisecondCounterHiRes();
                     view.tick (t0 + 0.05 * i);
                     auto image = editor->createComponentSnapshot (editor->getLocalBounds());
                     expect (image.isValid());
+                    perFrame << juce::String (juce::Time::getMillisecondCounterHiRes() - f0, 1) << (i + 1 < frames ? " / " : "");
                 }
 
                 const double ms = (juce::Time::getMillisecondCounterHiRes() - start) / frames;
                 logMessage ("cuadro completo a " + juce::String (s, 2) + "x (" + juce::String (editor->getWidth()) + "x"
-                            + juce::String (editor->getHeight()) + "): " + juce::String (ms, 1) + " ms, render por software");
+                            + juce::String (editor->getHeight()) + "): " + juce::String (ms, 1) + " ms, render por software ("
+                            + perFrame + ")");
                 expect (ms < 400.0, "dibujar el aparato entero tarda " + juce::String (ms, 1) + " ms");
             }
 

@@ -112,6 +112,9 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /*  La cinta sin rotar, en coordenadas locales. */
+    juce::Rectangle<float> getTapeBounds() const { return tapeArea(); }
+
 protected:
     juce::TextEditor* createEditorComponent() override;
     void editorShown (juce::TextEditor*) override;
@@ -128,7 +131,13 @@ public:
     PatternSwitch (const juce::StringArray& positions, const juce::String& title);
 
     HardwareKnob& getKnob() noexcept { return knob; }
+    const HardwareKnob& getKnob() const noexcept { return knob; }
     void tick (float dt);
+
+    /*  Caja de la etiqueta de una posicion, en coordenadas locales. */
+    juce::Rectangle<float> getLabelBounds (int index) const;
+
+    static constexpr float kLabelRadius = 61.0f;
 
     void resized() override;
     void paint (juce::Graphics&) override;

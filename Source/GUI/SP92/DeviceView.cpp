@@ -112,8 +112,8 @@ DeviceView::DeviceView (StabrProcessor& p)
     {
         const float cx = 46.0f + ((float) i + 0.5f) * 524.0f / 6.0f;
         auto enc = std::make_unique<HardwareKnob> ("encoder", 0, "Encoder " + juce::String (i + 1));
-        place (*enc, juce::roundToInt (cx - 19.0f), 411, 38, 38);
-        chassis.addSilk (juce::String (i + 1), cx, 457.0f);
+        place (*enc, juce::roundToInt (cx - 19.0f), 407, 38, 38);
+        chassis.addSilk (juce::String (i + 1), cx, 451.0f);
         encoders[(size_t) i] = std::move (enc);
     }
 
@@ -124,26 +124,28 @@ DeviceView::DeviceView (StabrProcessor& p)
     addKnob (pid::filterCutoff,    "CUTOFF",     "big",   11, 690.0f, 175.0f, 86.0f);
     addKnob (pid::filterResonance, "RESONANCE",  "big",   11, 842.0f, 175.0f, 86.0f);
     addKnob (pid::ampDecay,        "DECAY",      "big",   11, 994.0f, 175.0f, 86.0f);
-    addKnob (pid::filterEnvAmount, "ENV AMOUNT", "small", 11, 662.0f, 288.0f, 54.0f);
-    addKnob (pid::driveAmount,     "DRIVE",      "small", 11, 756.0f, 288.0f, 54.0f);
+    addKnob (pid::filterEnvAmount, "ENV AMOUNT", "small", 11, 662.0f, 286.0f, 54.0f);
+    addKnob (pid::driveAmount,     "DRIVE",      "small", 11, 756.0f, 286.0f, 54.0f);
 
-    chassis.addHead ("ECHO", { 812.0f, 252.0f, 260.0f, 11.0f });
-    chassis.addBezel ({ 812.0f, 272.0f, 260.0f, 76.0f });
-    place (echo, 821, 281, 242, 58);
-    addKnob (pid::delayDivision, "TIME",     "switch", 8,  852.0f, 384.0f, 44.0f);
-    addKnob (pid::delayFeedback, "FEEDBACK", "small",  11, 942.0f, 384.0f, 44.0f);
-    addKnob (pid::delayMix,      "MIX",      "small",  11, 1032.0f, 384.0f, 44.0f);
+    // Eco: pantalla mas baja y todo corrido hacia arriba para que las teclas de
+    // modo tengan aire (antes se pegaban a la serigrafia de las perillas).
+    chassis.addHead ("ECHO", { 812.0f, 250.0f, 260.0f, 11.0f });
+    chassis.addBezel ({ 812.0f, 268.0f, 260.0f, 72.0f });
+    place (echo, 821, 277, 242, 54);
+    addKnob (pid::delayDivision, "TIME",     "switch", 8,  852.0f, 378.0f, 44.0f);
+    addKnob (pid::delayFeedback, "FEEDBACK", "small",  11, 942.0f, 378.0f, 44.0f);
+    addKnob (pid::delayMix,      "MIX",      "small",  11, 1032.0f, 378.0f, 44.0f);
 
     const char* modes[] { "STEREO", "PING", "DUB" };
     for (int i = 0; i < 3; ++i)
     {
         auto& key = modeKeys[(size_t) i];
         setupKey (key, modes[i], false, true, juce::String ("Delay mode ") + modes[i]);
-        place (key, 812 + i * 88, 430, 84, 27);
+        place (key, 812 + i * 88, 436, 84, 27);
         key.onClick = [this, i] { setParam (pid::delayMode, (float) i); };
     }
 
-    place (vu, 612, 342, 178, 110);
+    place (vu, 612, 348, 178, 110);
 
     //--------------------------------------------------------------------------
     // Secuencia
@@ -169,7 +171,7 @@ DeviceView::DeviceView (StabrProcessor& p)
     place (patternSwitch, 459, 545, 82, 82);
     patternAttachment = std::make_unique<APVTS::SliderAttachment> (apvts, pid::seqPattern, patternSwitch.getKnob());
     patternSwitch.getKnob().getProperties().set (paramIdProperty, juce::String (pid::seqPattern));
-    chassis.addSilk ("PATTERN", 500.0f, 634.0f);
+    chassis.addSilk ("PATTERN", 500.0f, 640.0f);
 
     addKnob (pid::seqSwing, "SWING", "small",  11, 380.0f, 696.0f, 42.0f);
     addKnob (pid::seqGate,  "GATE",  "small",  11, 464.0f, 696.0f, 42.0f);
@@ -384,6 +386,57 @@ juce::StringArray DeviceView::getControlledParameterIDs() const
     ids.removeDuplicates (false);
     ids.removeEmptyStrings();
     return ids;
+}
+
+std::vector<DeviceView::VisualItem> DeviceView::getVisualItems() const
+{
+    std::vector<VisualItem> items;
+
+    for (const auto& it : chassis.getItems())
+        items.push_back ({ it.name, it.area, false });
+
+    auto add = [&items] (const juce::String& name, juce::Rectangle<float> area) { items.push_back ({ name, area, false }); };
+
+    auto addKnobCircle = [&items] (const HardwareKnob& k, juce::Rectangle<int> bounds)
+    {
+        const bool encoder = k.getProperties()["sp92Knob"].toString() == "encoder";
+        const int ticks = (int) k.getProperties().getWithDefault ("ticks", 0);
+        auto area = bounds.toFloat();
+
+        if (! encoder && ticks > 1)
+            area = area.reduced (2.0f);   // caja = diametro + 24; marcas hasta el radio + 10
+
+        items.push_back ({ "knob " + k.getTitle(), area, true });
+    };
+
+    for (const auto& k : knobs)    addKnobCircle (*k, k->getBounds());
+    for (const auto& e : encoders) addKnobCircle (*e, e->getBounds());
+    addKnobCircle (patternSwitch.getKnob(), patternSwitch.getBounds());
+
+    for (int i = 0; i < 5; ++i)
+        add ("pattern label " + juce::String (i + 1), patternSwitch.getLabelBounds (i) + patternSwitch.getPosition().toFloat());
+
+    for (const auto& key : softKeys) add ("key " + key.getTitle(), key.getBounds().toFloat());
+    for (const auto& key : modeKeys) add ("key " + key.getTitle(), key.getBounds().toFloat());
+
+    for (const auto* key : { &diskPrev, &diskNext, &diskSave, &seqKey, &undoKey, &redoKey })
+        add ("key " + key->getTitle(), key->getBounds().toFloat());
+
+    for (const auto& bat : bats)
+        add ("switch " + bat->getTitle(), bat->getBounds().toFloat());
+
+    add ("power", { (float) power.getBounds().getCentreX() - 20.0f, 32.0f, 40.0f, 26.0f });
+    add ("disk bay", disk.getBounds().toFloat().withTrimmedLeft (FloppyDrive::kBayX));
+    add ("disk led", { (float) disk.getX() + 2.0f, (float) disk.getY() + 58.0f, 6.0f, 6.0f });
+    add ("stab pad", { (float) stab.getX() + 8.0f, (float) stab.getY() + 4.0f, 196.0f, 204.0f });
+    add ("vu meter", vu.getBounds().toFloat());
+    add ("steps", steps.getBounds().toFloat());
+    add ("lcd", lcd.getBounds().toFloat());
+    add ("echo lcd", echo.getBounds().toFloat());
+    add ("head sequence", seqHead.getBounds().toFloat());
+    add ("tape", (tape.getTapeBounds() + tape.getPosition().toFloat()).expanded (0.0f, 4.0f));   // rotada 2.2 grados
+
+    return items;
 }
 
 //==============================================================================

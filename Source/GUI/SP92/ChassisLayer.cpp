@@ -88,6 +88,37 @@ void ChassisLayer::addHead (const juce::String& text, juce::Rectangle<float> are
 void ChassisLayer::addBezel (juce::Rectangle<float> area, const juce::String& tiny)               { bezels.push_back ({ area, tiny }); }
 void ChassisLayer::addWell (juce::Rectangle<float> area)                                          { wells.push_back (area); }
 
+std::vector<ChassisLayer::Item> ChassisLayer::getItems() const
+{
+    std::vector<Item> items;
+
+    auto textRect = [] (const juce::Font& f, const juce::String& t, float x, float y, float h, bool centred)
+    {
+        const float w = fonts::textWidth (f, t);
+        return juce::Rectangle<float> (centred ? x - w * 0.5f : x, y, w, h);
+    };
+
+    items.push_back ({ "brand", textRect (fonts::display (34.0f, 0.2f), "STABR", 40.0f, 24.0f, 34.0f, false) });
+    items.push_back ({ "model badge", { 268.0f, 25.0f, fonts::textWidth (fonts::display (13.0f, 0.12f), "SP-92") + 18.0f, 22.0f } });
+
+    const auto line1 = textRect (fonts::label (11.0f, 0.26f), "POLYPHONIC CHORD STAB SAMPLER", 360.0f, 24.0f, 16.5f, false);
+    const auto line2 = textRect (fonts::label (9.0f, 0.3f), utf8 ("16 STEPS \xc2\xb7 20 DISKS \xc2\xb7 DUB DELAY"), 360.0f, 40.5f, 13.5f, false);
+    items.push_back ({ "tagline", line1.getUnion (line2) });
+
+    for (const auto& s : silks)
+    {
+        const auto font = s.small ? fonts::label (9.0f, 0.14f) : fonts::label (11.0f, 0.16f);
+        items.push_back ({ "silk " + s.text, textRect (font, s.text, s.x, s.y, s.small ? 9.0f : 11.0f, s.centred) });
+    }
+
+    for (const auto& h : heads)   items.push_back ({ "head " + h.text, h.area });
+    for (const auto& b : bezels)  items.push_back ({ "bezel", b.area });
+    for (const auto& w : wells)   items.push_back ({ "well", w });
+
+    items.push_back ({ "serial plate", { 936.0f, 612.0f, 136.0f, 74.0f } });
+    return items;
+}
+
 void ChassisLayer::paint (juce::Graphics& g)
 {
     const auto& f = *fin;

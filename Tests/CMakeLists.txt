@@ -28,6 +28,13 @@ target_link_libraries(STABR_Tests PRIVATE
     juce::juce_recommended_config_flags
 )
 
+# Cada test de la GUI crea un StabrProcessor local por bloque, y MSVC reserva un
+# lugar en la pila para cada uno: con 1 MB (el default) el runTest del editor
+# desbordaba la pila al entrar. 16 MB sobra.
+if(MSVC)
+    target_link_options(STABR_Tests PRIVATE /STACK:16777216)
+endif()
+
 if(WIN32)
     target_compile_definitions(STABR_Tests PRIVATE _CONSOLE=1)
     set_target_properties(STABR_Tests PROPERTIES WIN32_EXECUTABLE FALSE)

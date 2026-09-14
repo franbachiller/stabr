@@ -1,5 +1,6 @@
 #include "HardwareKnob.h"
 #include "Anim.h"
+#include "ButtonMotion.h"
 
 #include <cmath>
 
@@ -20,9 +21,16 @@ HardwareKnob::HardwareKnob (const juce::String& style, int ticks, const juce::St
     setMouseDragSensitivity (kDragPixels);
     setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
 
+    // La sombra cae mas abajo que la caja: sin esto se veia cortada.
+    setPaintingIsUnclipped (true);
+
     getProperties().set ("sp92Knob", style);
     getProperties().set ("ticks", ticks);
 }
+
+void HardwareKnob::focusGained (FocusChangeType) { repaintWithMargin (*this, 16); }
+void HardwareKnob::focusLost (FocusChangeType)   { repaintWithMargin (*this, 16); }
+void HardwareKnob::enablementChanged()           { repaintWithMargin (*this, 24); }
 
 bool HardwareKnob::isDiscrete() const
 {

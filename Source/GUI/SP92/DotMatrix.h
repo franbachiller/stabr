@@ -19,13 +19,18 @@ const std::uint8_t* dotGlyph (juce::juce_wchar c) noexcept;
     y cada punto va hacia su estado con la inercia de un cristal liquido real:
     prende en ~35 ms y se apaga en ~120 ms. Una pantalla quieta no repinta.
 
-    Los puntos apagados van a una imagen cacheada; los encendidos, agrupados en
-    seis niveles de brillo. En los acabados con brillo se pinta antes un halo.
+    Render (D-051): los puntos son cuadrados y se rasterizan a mano sobre los
+    pixeles fisicos, calculando la cobertura exacta de cada punto en cada pixel.
+    Asi todos los puntos son identicos a cualquier escala: nada de redondeos
+    del renderizador ni moire entre puntos prendidos y apagados. Encima va el
+    brillo: un resplandor gaussiano en las pantallas emisivas (ambar, azul) y la
+    sombra que cada punto proyecta sobre la retroiluminacion en el LCD verde.
+    Solo se recalcula la zona que cambio.
 */
 class DotMatrix final : public juce::Component
 {
 public:
-    DotMatrix (int dotsWide, int dotsHigh);
+    DotMatrix (int dotsWide, int dotsHigh, juce::BorderSize<int> glassInsets = { 8, 10, 8, 10 });
 
     void setFinish (const Finish&);
 
@@ -49,21 +54,45 @@ public:
     int getDotsWide() const noexcept { return W; }
     int getDotsHigh() const noexcept { return H; }
 
+    /*  Area de la grilla y de un punto encendido, en coordenadas locales. */
+    juce::Rectangle<float> getGridArea() const;
+    juce::Rectangle<float> getDotRect (int x, int y) const;
+
+    /*  La capa de puntos del ultimo paint, pixel a pixel (para tests). */
+    const juce::Image& getDotLayer() const noexcept { return layer; }
+
     void paint (juce::Graphics&) override;
-    void resized() override { unlitCache = {}; }
+    void resized() override { geomScale = 0.0f; }
 
     static constexpr float kOnTau = 0.012f, kOffTau = 0.040f;
+    static constexpr float kLitSize = 0.88f, kUnlitSize = 0.82f;
 
 private:
+    struct Span
+    {
+        int first = 0;
+        std::vector<float> weights;
+    };
+
+    void rebuildGeometry (float scale);
+    void renderRegion (juce::Rectangle<int> dots);
+
     const int W, H;
+    const juce::BorderSize<int> insets;
     std::vector<std::uint8_t> fb, last;
     std::vector<float> level;
     bool settling = true;
     const Finish* fin = nullptr;
 
-    juce::Image unlitCache;
-    juce::Colour unlitColour;
-    float unlitScale = 0.0f;
+    // Geometria a la escala fisica actual.
+    float geomScale = 0.0f;
+    int geomW = 0, geomH = 0, PW = 0, PH = 0;
+    std::vector<Span> litCols, litRows, offCols, offRows;
+    std::vector<float> lit, glow, tmp, unlit, kernel;
+    int blurRadius = 1, shadowDx = 0, shadowDy = 0;
+    juce::Image layer;
+    juce::Rectangle<int> dirtyDots;
+    bool fullDirty = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DotMatrix)
 };

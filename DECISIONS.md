@@ -1090,6 +1090,56 @@ pintan sin recorte y repintan el margen donde cae la sombra.
   estudio queda fija. Giran el moleteado, el aluminio y el indicador, que es lo
   que se mueve en una perilla de verdad.
 
-**VU calibrado:** 0 VU = −12 dBFS de pico. Un stab calibrado a −18 dB de golpe
+**VU calibrado (ver también D-051):** 0 VU = −12 dBFS de pico. Un stab calibrado a −18 dB de golpe
 (D-046) lleva la aguja alrededor del cero. La escala no es lineal: se interpola
 entre las marcas de la cara (−20, −10, −7, −5, −3, 0, +3).
+
+## D-051 · Fase 8 · Pantalla perfecta, perillas enteras y separaciones medidas
+
+**Reporte del usuario (captura en FL Studio):** las letras de la pantalla se
+veían raras, "como si se cruzara la textura de fondo", asimétricas; algunas
+perillas se veían cortadas; STEREO / PING / DUB quedaban encimados a lo de
+arriba.
+
+**Diagnóstico con datos:**
+
+- **Pantalla.** Los puntos medían 2,65 × 2,5 px. Direct2D redondea cada
+  rectángulo a su manera: puntos de 2 y de 3 px, huecos desparejos. Los puntos
+  apagados eran una imagen reescalada a otra grilla: moiré contra los
+  encendidos. A 1x, además, el hueco entre puntos (0,3 px) no se ve como hueco
+  sino como una trama clara que cruza los trazos.
+- **Perillas.** La sombra (`0 8px 12px`) cae 14 px bajo la perilla y el
+  componente tenía 12 px de margen; los encoders, cero. JUCE la recortaba.
+- **Separaciones.** TIME / FEEDBACK / MIX se pisaban 1 px con las teclas de
+  modo; ENV AMOUNT y DRIVE quedaban a 2 px del VU; las posiciones del selector
+  de patrón a 3 px de su perilla.
+
+**Soluciones:**
+
+- **La pantalla se rasteriza a mano** sobre los píxeles físicos, con la
+  cobertura exacta de cada punto cuadrado en cada píxel, y se dibuja 1:1. Un
+  test pinta un punto a 125 % en cuatro lugares y mide la misma tinta
+  (8,21 / 8,19 / 8,16 / 8,21).
+- **El hueco entre puntos depende de la resolución:** a 1x los encendidos se
+  tocan y las letras quedan sólidas; a 2x aparece el hueco. La trama de puntos
+  apagados siempre se ve, y fuera de la grilla va el mismo tono medio para que
+  el área activa no se lea como un rectángulo.
+- **Brillo leve y realista:** resplandor gaussiano de ~0,6 punto en ámbar y
+  azul; en el LCD verde, la sombra que cada punto proyecta sobre la
+  retroiluminación, corrida abajo a la derecha, como en un STN real. El reflejo
+  del vidrio perdió el corte neto que se leía como una raya.
+- **Rendimiento:** solo se recalcula la zona de la pantalla que cambió.
+  Un cuadro completo del aparato sigue en ~21 ms por software.
+- **Perillas sin recorte** (`setPaintingIsUnclipped`); foco y habilitación
+  repintan el margen de la sombra.
+- **Layout corrido:** pantalla de eco más baja (72 px), perillas del eco
+  6 px arriba, teclas de modo 6 px abajo, VU 6 px abajo, ENV AMOUNT y DRIVE
+  2 px arriba, encoders 4 px arriba, posiciones del patrón a 61 px.
+- **Test de separaciones:** 91 piezas visibles (textos medidos con su fuente,
+  perillas como círculo con sus marcas, teclas, pantallas, VU, cinta). Entre
+  cada par, salvo lo que va adentro de otra pieza, al menos 3,5 px. Mínimo
+  actual: 4 px, entre una perilla y su propia serigrafía, a propósito.
+
+**De paso:** el ejecutable de tests desbordaba la pila de 1 MB al entrar al
+test del editor (MSVC reserva un lugar por cada `StabrProcessor` local de cada
+bloque). Se le dio 16 MB.

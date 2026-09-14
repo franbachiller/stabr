@@ -39,8 +39,9 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed (const juce::KeyPress&) override;
-    void focusGained (FocusChangeType) override { repaint(); }
-    void focusLost (FocusChangeType) override   { repaint(); }
+    void focusGained (FocusChangeType) override;
+    void focusLost (FocusChangeType) override;
+    void enablementChanged() override;
 
     static constexpr double kPresetSeconds = 0.45;   // la maqueta: .45 s ease-out cubico
     static constexpr double kDetentSeconds = 0.07;

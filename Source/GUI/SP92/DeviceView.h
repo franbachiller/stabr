@@ -62,6 +62,18 @@ public:
         pagina. */
     juce::StringArray getControlledParameterIDs() const;
 
+    /*  Cada pieza visible del panel con el lugar que ocupa a la vista (textos
+        medidos, perillas como circulo con sus marcas, teclas, pantallas). El
+        test de separaciones exige aire entre todas. */
+    struct VisualItem
+    {
+        juce::String name;
+        juce::Rectangle<float> area;
+        bool round = false;
+    };
+
+    std::vector<VisualItem> getVisualItems() const;
+
     juce::String getEncoderParamID (int index) const;
     StepGrid& getStepGrid() noexcept { return steps; }
     DotMatrix& getLcd() noexcept { return lcd; }
@@ -115,7 +127,7 @@ private:
     std::vector<std::unique_ptr<HardwareKnob>> knobs;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> knobAttachments;
 
-    DotMatrix echo { 96, 22 };
+    DotMatrix echo { 96, 22, juce::BorderSize<int> (5, 6, 5, 6) };
     std::array<juce::TextButton, 3> modeKeys;
     VuMeter vu;
 

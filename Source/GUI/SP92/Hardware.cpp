@@ -695,22 +695,28 @@ void PatternSwitch::tick (float dt)
     }
 
     if (changed)
-        repaintWithMargin (*this, 60);
+        repaintWithMargin (*this, 72);
+}
+
+juce::Rectangle<float> PatternSwitch::getLabelBounds (int index) const
+{
+    const auto c = getLocalBounds().toFloat().getCentre();
+    const float a = (-135.0f + 270.0f * (float) index / (float) juce::jmax (1, positions.size() - 1)) * pi / 180.0f;
+    const auto at = onCircle (c, kLabelRadius, a);
+    const float w = fonts::textWidth (fonts::label (9.0f, 0.1f), positions[index].toUpperCase());
+    return { at.x - w * 0.5f, at.y - 4.5f, w, 9.0f };
 }
 
 void PatternSwitch::paint (juce::Graphics& g)
 {
     const auto& f = currentFinish (*this);
-    const auto c = getLocalBounds().toFloat().getCentre();
     const auto font = fonts::label (9.0f, 0.1f);
 
     for (int i = 0; i < positions.size(); ++i)
     {
-        const float a = (-135.0f + 270.0f * (float) i / (float) juce::jmax (1, positions.size() - 1)) * pi / 180.0f;
-        const auto at = onCircle (c, 58.0f, a);
         const float amt = juce::jmax (0.0f, amounts[(size_t) i]);
         g.setColour (f.silkMuted.interpolatedWith (f.silk, amt));
-        fonts::drawText (g, positions[i].toUpperCase(), font, { at.x - 50.0f, at.y - 4.5f, 100.0f, 9.0f }, juce::Justification::centred);
+        fonts::drawText (g, positions[i].toUpperCase(), font, getLabelBounds (i), juce::Justification::centredLeft);
     }
 }
 

@@ -31,6 +31,16 @@ public:
 
     void paint (juce::Graphics&) override;
 
+    /*  Todo lo que pinta la capa y ocupa lugar (textos medidos con su fuente,
+        marcos, pozo, placa): lo usa el test de separaciones. */
+    struct Item
+    {
+        juce::String name;
+        juce::Rectangle<float> area;
+    };
+
+    std::vector<Item> getItems() const;
+
 private:
     struct Silk { juce::String text; float x, y; bool centred, small; };
     struct Head { juce::String text; juce::Rectangle<float> area; };
