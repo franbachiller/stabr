@@ -31,14 +31,16 @@ aguja, disquetera. Todo dibujado por código, sin imágenes, nítido de 75 % a
 200 %. Tres acabados: **Beige '87**, **Graphite '92** y **Arctic '89**, que se
 eligen desde POWER.
 
-- **Pantalla 190 × 72:** el acorde que suena con su nombre **detectado** y el
-  voicing por altura; en cada página, un gráfico (forma de onda, respuesta del
-  filtro, repeticiones, cola de reverb, curva de saturación, pump).
+- **Pantalla 190 × 72:** el acorde que suena con su nombre **detectado**, un
+  teclado con las teclas encendidas y las notas del bajo al agudo; en cada
+  página, un gráfico (forma de onda, respuesta del filtro, repeticiones, cola
+  de reverb, curva de saturación, pump).
 - **7 teclas de función y 6 encoders:** cada tecla abre una página, apretarla
   de nuevo pasa de subpágina, y los encoders controlan lo que muestra la
   pantalla.
-- **Pantalla de eco:** cada repetición en el tiempo y en el estéreo, encendida
-  por cada golpe real.
+- **Pantalla de eco:** carriles L y R, el golpe y cada repetición como una
+  barra tan alta como su volumen, con regla de tiempos y compases; se
+  encienden al sonar ([D-052](DECISIONS.md)).
 - **16 pads:** clic enciende, arrastrar ajusta la velocity, clic derecho abre
   ratchet y probabilidad. Editar un patrón de fábrica lo copia a `Custom`.
 - **STAB** genera un sonido nuevo y las perillas giran hasta él. Las palancas

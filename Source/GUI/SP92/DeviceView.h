@@ -103,7 +103,6 @@ private:
     float raw (const char* paramID) const;
 
     void drawMainLcd (double now);
-    void drawVoicing (const chord::ChordResult&, double now);
     void drawGraph();
     void drawCells();
     void drawEchoLcd (double now);

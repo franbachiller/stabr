@@ -122,6 +122,12 @@ void DotMatrix::set (int x, int y) noexcept
         fb[(size_t) (y * W + x)] = 1;
 }
 
+void DotMatrix::unset (int x, int y) noexcept
+{
+    if (x >= 0 && y >= 0 && x < W && y < H)
+        fb[(size_t) (y * W + x)] = 0;
+}
+
 bool DotMatrix::isLit (int x, int y) const noexcept
 {
     return x >= 0 && y >= 0 && x < W && y < H && fb[(size_t) (y * W + x)] != 0;

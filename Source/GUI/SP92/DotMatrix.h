@@ -36,6 +36,7 @@ public:
 
     void clear() noexcept;
     void set (int x, int y) noexcept;
+    void unset (int x, int y) noexcept;
     void block (int x, int y, int size) noexcept;
     void hline (int x0, int x1, int y, bool dotted = false) noexcept;
     void vline (int x, int y0, int y1, bool dotted = false) noexcept;

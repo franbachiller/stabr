@@ -77,6 +77,7 @@ target_sources(STABR PRIVATE
     Source/GUI/SP92/DotMatrix.cpp
     Source/GUI/SP92/Sp92Fonts.cpp
     Source/GUI/SP92/LcdPages.cpp
+    Source/GUI/SP92/LcdDrawing.cpp
     Source/GUI/SP92/Sp92LookAndFeel.cpp
     Source/GUI/SP92/HardwareKnob.cpp
     Source/GUI/SP92/Hardware.cpp

@@ -1,5 +1,6 @@
 #include "DeviceView.h"
 #include "LcdPages.h"
+#include "LcdDrawing.h"
 #include "Sp92Fonts.h"
 #include "Sp92LookAndFeel.h"
 #include "../ChordText.h"
@@ -591,7 +592,7 @@ void DeviceView::drawMainLcd (double now)
         detail << " INV" << (int) raw (pid::chordInversion) << " " << (int) raw (pid::chordDensity) << "V";
         lcd.text (detail, 2, 40);
 
-        drawVoicing (notes, now);
+        lcdraw::drawKeyboard (lcd, notes, 82, 189, 13, now - lastOnset < 0.18);
     }
     else
     {
@@ -612,33 +613,6 @@ void DeviceView::drawMainLcd (double now)
     else if (! creating)
     {
         drawCells();
-    }
-}
-
-void DeviceView::drawVoicing (const chord::ChordResult& notes, double now)
-{
-    constexpr int x0 = 104, x1 = 188, y0 = 13, y1 = 46;
-
-    if (notes.count <= 0)
-        return;
-
-    int lo = notes[0], hi = notes[0];
-    for (int i = 1; i < notes.count; ++i) { lo = juce::jmin (lo, notes[i]); hi = juce::jmax (hi, notes[i]); }
-
-    const int span = juce::jmax (24, hi - lo + 8);
-    const int base = (lo + hi) / 2 - span / 2;
-    auto yOf = [&] (int n) { return juce::roundToInt ((float) y1 - (float) (n - base) / (float) span * (float) (y1 - y0)); };
-
-    for (int n = ((base + 11) / 12) * 12; n <= base + span; n += 12)
-        lcd.hline (x0 + 8, x1, yOf (n), true);
-
-    const bool flash = now - lastOnset < 0.18;
-
-    for (int i = 0; i < notes.count; ++i)
-    {
-        const int y = yOf (notes[i]), x = x0 + 10 + i * 7;
-        lcd.hline (x + 2, x1 - 1, y);
-        lcd.block (x - (flash ? 1 : 0), y - 1 - (flash ? 1 : 0), flash ? 4 : 3);
     }
 }
 
@@ -753,7 +727,7 @@ void DeviceView::drawGraph()
                 cache.fillChordParams (cp);
                 notes = chord::generateChord (48 + cp.keyRoot, cp);
             }
-            drawVoicing (notes, lastNow);
+            lcdraw::drawKeyboard (lcd, notes, 82, 189, 13, lastNow - lastOnset < 0.18);
             break;
         }
     }
@@ -764,28 +738,37 @@ void DeviceView::drawCells()
     constexpr int W = 190;
     const auto& slots = lcdPages()[(size_t) page].subPages[(size_t) subPage];
 
-    for (int i = 0; i < 6; ++i)
+    std::array<juce::String, 6> labels, values;
+    std::array<int, 6> widths {};
+
+    for (size_t i = 0; i < 6; ++i)
     {
-        const int xc = juce::roundToInt (((float) i + 0.5f) * (float) W / 6.0f);
-        const auto& slot = slots[(size_t) i];
+        const auto& slot = slots[i];
 
         if (slot.paramID == nullptr)
+            values[i] = "--";
+        else
         {
-            lcd.textCenter ("--", xc, 62);
-            continue;
+            labels[i] = juce::String (slot.label).substring (0, 5);
+            if (auto* param = apvts.getParameter (slot.paramID))
+                values[i] = lcdValue (*param).substring (0, 5);
         }
 
-        lcd.textCenter (juce::String (slot.label).substring (0, 5), xc, 52);
+        widths[i] = juce::jmax (lcd.textWidth (labels[i]), lcd.textWidth (values[i]));
+    }
 
-        if (auto* param = apvts.getParameter (slot.paramID))
-            lcd.textCenter (lcdValue (*param).substring (0, 5), xc, 62);
+    // Columnas con aire: "SCALE" y "VOICE" ya no se leen como una palabra.
+    const auto left = lcdraw::layoutCells (widths, W);
+
+    for (size_t i = 0; i < 6; ++i)
+    {
+        lcd.text (labels[i], left[i] + (widths[i] - lcd.textWidth (labels[i])) / 2, 52);
+        lcd.text (values[i], left[i] + (widths[i] - lcd.textWidth (values[i])) / 2, 62);
     }
 }
 
 void DeviceView::drawEchoLcd (double now)
 {
-    constexpr int W = 96, x0 = 3;
-    constexpr int lanes[] { 6, 16 };
     echo.clear();
 
     DelayViewInfo info;
@@ -797,37 +780,7 @@ void DeviceView::drawEchoLcd (double now)
     info.enabled  = raw (pid::delayEnabled) > 0.5f;
     info.freeze   = raw (pid::delayFreeze) > 0.5f;
 
-    if (! info.enabled)
-    {
-        echo.textCenter ("DELAY OFF", W / 2, 8);
-        return;
-    }
-
-    std::array<Echo, kMaxEchoes> echoes {};
-    const int count = computeEchoes (info, echoes);
-    const float window = echoWindowSeconds (echoes, count);
-    const float elapsed = (float) (now - lastOnset);
-
-    for (int y : lanes)
-        for (int x = x0; x < W; x += 3)
-            echo.set (x, y);
-
-    if (elapsed >= 0.0f && elapsed < 0.15f)
-        for (int y : lanes)
-            echo.block (x0 - 1, y - 1, 3);
-
-    for (int i = 0; i < count; ++i)
-    {
-        const auto& ec = echoes[(size_t) i];
-        const int x = juce::roundToInt ((float) x0 + 4.0f + ec.time / window * (float) (W - x0 - 8));
-        const int y = lanes[ec.channel];
-        const bool lit = info.freeze || (elapsed >= ec.time && elapsed < ec.time + 0.32f);
-        const int s = lit ? (ec.gain > 0.45f ? 3 : 2) : 1;
-        echo.block (x - (s > 1 ? 1 : 0), y - (s > 1 ? 1 : 0), s);
-    }
-
-    if (elapsed >= 0.0f && elapsed < window)
-        echo.vline (juce::roundToInt ((float) x0 + 4.0f + elapsed / window * (float) (W - x0 - 8)), 1, 20, true);
+    lcdraw::drawEcho (echo, info, (float) (now - lastOnset), proc.getGuiFeed().bpm.load (std::memory_order_relaxed));
 }
 
 //==============================================================================

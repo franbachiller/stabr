@@ -1143,3 +1143,45 @@ arriba.
 **De paso:** el ejecutable de tests desbordaba la pila de 1 MB al entrar al
 test del editor (MSVC reserva un lugar por cada `StabrProcessor` local de cada
 bloque). Se le dio 16 MB.
+
+## D-052 · Fase 8 · Las pantallas dicen algo de un vistazo
+
+**Reporte del usuario (captura en FL Studio):** en la pantalla principal "esas
+líneas se ven raras, no sé qué quieren representar"; la pantalla de eco tiene
+que mostrar su propósito perfectamente.
+
+**Problema:** el voicing se dibujaba como una raya horizontal por nota a su
+altura, sobre líneas punteadas de octava. Técnicamente correcto, ilegible. La
+pantalla de eco, en reposo, eran dos punteados con marcas de un punto.
+
+**Pantalla principal: un teclado.** Cualquier músico lo lee sin explicación:
+
+- 2, 3 o 4 octavas según lo abierto del voicing (teclas de 7, 5 o 3 puntos),
+  empezando en el Do de la nota más grave, centrado en su lugar.
+- Las teclas que suenan, llenas; las negras que no suenan, en contorno y
+  recortadas sobre las blancas con un punto de aire, como un teclado real.
+- Debajo, los nombres de las notas del bajo al agudo ("D F A C"): el voicing
+  y la inversión se leen también en texto.
+- Al sonar, una raya bajo cada tecla durante 180 ms.
+- Lo mismo en CHORD 2/2.
+
+**Pantalla de eco:**
+
+- Carriles **L** y **R** con su letra.
+- El golpe original al principio de los dos.
+- Cada repetición como una barra cuya altura es su volumen: el feedback se ve
+  en cómo bajan.
+- Regla entre los carriles: un punto por tiempo y tres por compás, al tempo
+  del proyecto.
+- Las repeticiones que están sonando se duplican.
+- Un cursor recorre la pantalla después de cada golpe.
+
+**Última fila:** las seis columnas se abren cuando dos textos anchos quedan
+juntos ("SCALEVOICE" se leía como una palabra), con el mayor aire que entre
+(de 5 a 3 puntos; seis textos de 5 letras con 3 de aire siempre entran).
+
+**Verificado:** el dibujo vive en `LcdDrawing` (funciones puras) y se testea
+punto por punto. Teclas encendidas y apagadas en Dm7, negras que suenan
+llenas, 3 y 4 octavas, nombres "D F A C", una barra por repetición en su
+canal, la primera más alta que la tercera, la repetición que suena duplicada,
+y 5000 combinaciones de columnas con al menos 3 puntos de aire.

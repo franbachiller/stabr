@@ -5,6 +5,7 @@
 #include "GUI/SP92/Finish.h"
 #include "GUI/SP92/LcdPages.h"
 #include "GUI/SP92/DotMatrix.h"
+#include "GUI/SP92/LcdDrawing.h"
 #include "GUI/SP92/Anim.h"
 #include "GUI/SP92/ButtonMotion.h"
 #include "GUI/SP92/Hardware.h"
@@ -1022,6 +1023,162 @@ public:
     }
 };
 
+//==============================================================================
+class LcdDrawingTests : public juce::UnitTest
+{
+public:
+    LcdDrawingTests() : juce::UnitTest ("SP-92 pantallas: teclado, eco y columnas", "GUI") {}
+
+    void runTest() override
+    {
+        using namespace gui::sp92;
+
+        auto chordOf = [] (std::initializer_list<int> notes)
+        {
+            chord::ChordResult c;
+            for (int n : notes)
+                c.notes[(size_t) c.count++] = n;
+            return c;
+        };
+
+        beginTest ("teclado: las teclas del acorde encendidas, las demas vacias");
+        {
+            DotMatrix m (190, 72);
+            const auto dm7 = chordOf ({ 50, 53, 57, 60 });   // D3 F3 A3 C4
+            lcdraw::drawKeyboard (m, dm7, 82, 189, 13, false);
+            const auto k = lcdraw::keyboardFor (dm7, 82, 189, 13);
+
+            expectEquals (k.octaves, 2);
+            expectEquals (k.lowC, 48);
+            expect (k.x >= 82 && k.x + k.width() - 1 <= 189, "el teclado se sale de su lugar");
+
+            // Parte baja de cada blanca (debajo de las negras).
+            auto lowerCentreLit = [&] (int note)
+            {
+                const auto r = k.keyInterior (note);
+                return m.isLit (r.getCentreX(), r.getBottom() - 2);
+            };
+
+            for (int note : { 50, 53, 57, 60 })
+                expect (lowerCentreLit (note), "no se encendio la nota " + juce::String (note));
+
+            for (int note : { 48, 52, 55, 59, 62, 64, 71 })
+                expect (! lowerCentreLit (note), "se encendio una nota que no suena: " + juce::String (note));
+
+            // Negra que no suena: contorno con el centro vacio.
+            const int cSharp = k.blackKeyCentre (49);
+            expect (! m.isLit (cSharp, k.y + 6), "C# no suena y esta llena");
+            expect (m.isLit (cSharp - 1, k.y + 6), "a C# le falta el contorno");
+
+            // Los nombres, del bajo al agudo, a la derecha bajo el teclado.
+            DotMatrix names (190, 72);
+            names.textRight ("D F A C", 189, 13 + lcdraw::KeyboardLayout::whiteHeight + 4);
+            bool same = true;
+            for (int y = 39; y < 46; ++y)
+                for (int x = 120; x < 190; ++x)
+                    same = same && names.isLit (x, y) == m.isLit (x, y);
+            expect (same, "los nombres de las notas no son D F A C");
+        }
+
+        beginTest ("teclado: negra que suena llena, y voicings abiertos en 3 y 4 octavas");
+        {
+            DotMatrix m (190, 72);
+            const auto gSharp = chordOf ({ 56, 59, 63 });   // G#3 B3 D#4
+            lcdraw::drawKeyboard (m, gSharp, 82, 189, 13, false);
+            const auto k = lcdraw::keyboardFor (gSharp, 82, 189, 13);
+            expect (m.isLit (k.blackKeyCentre (56), k.y + 6), "G# suena y no esta llena");
+            expect (m.isLit (k.blackKeyCentre (63), k.y + 6), "D# suena y no esta llena");
+
+            const auto open = chordOf ({ 36, 55, 64, 71 });   // C2 .. B4
+            const auto k3 = lcdraw::keyboardFor (open, 82, 189, 13);
+            expectEquals (k3.octaves, 3);
+            expect (k3.contains (36) && k3.contains (71));
+
+            const auto wide = chordOf ({ 36, 60, 76, 83 });
+            const auto k4 = lcdraw::keyboardFor (wide, 82, 189, 13);
+            expectEquals (k4.octaves, 4);
+            expect (k4.x >= 82 && k4.x + k4.width() - 1 <= 189);
+        }
+
+        beginTest ("eco: carriles L y R, el golpe y una barra por repeticion en su canal");
+        {
+            DotMatrix m (96, 22);
+            gui::DelayViewInfo info;
+            info.timeL = 0.3f;
+            info.timeR = 0.4f;
+            info.feedback = 0.5f;
+            info.mode = (int) fx::DelayMode::pingPong;
+
+            lcdraw::drawEcho (m, info, 100.0f, 120.0f);
+
+            std::array<gui::Echo, gui::kMaxEchoes> echoes {};
+            const int count = gui::computeEchoes (info, echoes);
+            int expected[2] { 1, 1 };   // el golpe original en cada carril
+            for (int i = 0; i < count; ++i)
+                ++expected[echoes[(size_t) i].channel];
+
+            auto barsOnLane = [&m] (int lane)
+            {
+                int bars = 0;
+                bool prev = false;
+                for (int x = lcdraw::EchoScreen::laneStart; x < 96; ++x)
+                {
+                    const bool on = m.isLit (x, lane - 1);
+                    bars += on && ! prev ? 1 : 0;
+                    prev = on;
+                }
+                return bars;
+            };
+
+            expectEquals (barsOnLane (lcdraw::EchoScreen::laneL), expected[0]);
+            expectEquals (barsOnLane (lcdraw::EchoScreen::laneR), expected[1]);
+            expect (m.isLit (0, lcdraw::EchoScreen::laneL), "falta la L");
+            expect (m.isLit (0, lcdraw::EchoScreen::laneR), "falta la R");
+
+            // La primera repeticion es la mas alta: el volumen se lee en la altura.
+            const int x1 = lcdraw::EchoScreen::xOf (echoes[0].time, gui::echoWindowSeconds (echoes, count));
+            const int x3 = lcdraw::EchoScreen::xOf (echoes[2].time, gui::echoWindowSeconds (echoes, count));
+            auto height = [&m] (int x, int lane) { int h = 0; while (h < 5 && m.isLit (x, lane - h - 1)) ++h; return h; };
+            expect (height (x1, lcdraw::EchoScreen::laneL) > height (x3, lcdraw::EchoScreen::laneL));
+
+            // Durante la repeticion, su barra se duplica.
+            DotMatrix playing (96, 22);
+            lcdraw::drawEcho (playing, info, echoes[0].time + 0.05f, 120.0f);
+            expect (playing.isLit (x1 + 1, lcdraw::EchoScreen::laneL - 1), "la repeticion que suena no se enciende");
+        }
+
+        beginTest ("columnas del LCD: siempre con aire y dentro de la pantalla");
+        {
+            juce::Random rng (0x5AB);
+            int worstGap = 100;
+
+            for (int trial = 0; trial < 5000; ++trial)
+            {
+                std::array<int, 6> widths {};
+                for (auto& w : widths)
+                    w = trial == 0 ? 29 : rng.nextInt (30);
+
+                const auto left = lcdraw::layoutCells (widths, 190);
+                expect (left[0] >= 0 && left[5] + widths[5] <= 190, "columnas fuera de la pantalla");
+
+                for (size_t i = 1; i < 6; ++i)
+                {
+                    const int gap = left[i] - (left[i - 1] + widths[i - 1]);
+                    worstGap = juce::jmin (worstGap, gap);
+                    if (gap < 3)
+                        expect (false, "columnas pegadas: " + juce::String (gap));
+                }
+            }
+
+            const auto chordPage = lcdraw::layoutCells ({ 23, 17, 29, 29, 17, 23 }, 190);   // TYPE KEY SCALE VOICE INV DENS
+            const int scaleVoiceGap = chordPage[3] - (chordPage[2] + 29);
+            logMessage ("aire minimo en 5000 casos: " + juce::String (worstGap) + " puntos; SCALE-VOICE: " + juce::String (scaleVoiceGap));
+            expect (scaleVoiceGap >= 4);
+        }
+    }
+};
+
+static LcdDrawingTests lcdDrawingTests;
 static MotionTests motionTests;
 static ChordNamingTests chordNamingTests;
 static GuiFeedTests guiFeedTests;
