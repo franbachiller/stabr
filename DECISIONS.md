@@ -1226,3 +1226,20 @@ caracteres, y "F B E" (tres notas sin nombre de acorde) a 3x mide 87 puntos:
 pisaba un teclado de 3 octavas que empieza en el punto 83. Ahora usa la letra
 más grande que entra antes del teclado con 4 puntos de aire (3x, 2x o 1x).
 Un test lo verifica con "G#m9", "F B E", "C#m7b5/G" y un voicing de 4 octavas.
+
+## D-054 · Fase 8 · El piloto de la disquetera va dentro de la disquetera
+
+**Reporte del usuario:** la lucecita verde al lado de los disquetes, que se
+prende al cambiar de preset, se veía rara y con el brillo cortado.
+
+**Causa:** la maqueta ubicaba el piloto de lectura afuera de la disquetera, a
+la izquierda, sobre la franja. Estaba 2 px adentro del borde del componente, y
+su resplandor (8 px) se salía de ese borde: JUCE lo recortaba. Además, suelto
+sobre la franja no se leía como parte de la disquetera.
+
+**Solución:** el piloto va dentro del hueco, abajo a la derecha, junto al
+disquete, como el LED de una disquetera real. Tiene aro oscuro, lente verde
+oscuro apagada y un reflejo, y su brillo queda entero dentro del componente.
+El componente de la disquetera pasa a medir lo mismo que el hueco
+(704, 12, 246 × 71). La luz sigue igual: prende al empezar el cambio de disco
+y se apaga con cola a los 650 ms.

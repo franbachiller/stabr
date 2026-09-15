@@ -71,7 +71,7 @@ public:
     bool hitTest (int x, int y) override { return x >= (int) kBayX && y >= 0; }
 
     static constexpr double kHalfSwap = 0.28;
-    static constexpr float kBayX = 16.0f;
+    static constexpr float kBayX = 0.0f;   // el piloto va dentro del hueco: el componente es solo la disquetera
 
 protected:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;

@@ -444,12 +444,19 @@ void FloppyDrive::paintButton (juce::Graphics& g, bool, bool)
         g.fillRect (bay);
     }
 
-    // Piloto de lectura, junto a la disquetera como en la maqueta.
-    const juce::Rectangle<float> ledRect { 2.0f, 58.0f, 6.0f, 6.0f };
+    // Piloto de lectura dentro del hueco, abajo a la derecha, al lado del
+    // disquete: como el LED de una disquetera real. Afuera del componente su
+    // brillo quedaba cortado (D-054).
+    const juce::Rectangle<float> ledRect { bay.getRight() - 14.0f, bay.getBottom() - 13.0f, 6.0f, 6.0f };
     const auto green = juce::Colour (0xff6dff4a);
-    anim::ledGlow (g, ledRect, green, led, 8.0f);
-    g.setColour (juce::Colour (0xff3a2a18).interpolatedWith (green, led));
+
+    g.setColour (juce::Colours::black.withAlpha (0.7f));                        // aro del panel
+    g.fillEllipse (ledRect.expanded (1.5f));
+    anim::ledGlow (g, ledRect, green, led, 6.0f);
+    g.setColour (juce::Colour (0xff22341c).interpolatedWith (green, led));        // lente apagada: verde oscuro
     g.fillEllipse (ledRect);
+    g.setColour (juce::Colours::white.withAlpha (0.18f + 0.22f * led));           // reflejo de la lente
+    g.fillEllipse (ledRect.getX() + 1.2f, ledRect.getY() + 0.9f, 2.2f, 1.6f);
 
     if (hasKeyboardFocus (false))
     {

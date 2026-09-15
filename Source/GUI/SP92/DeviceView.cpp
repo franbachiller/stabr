@@ -72,7 +72,7 @@ DeviceView::DeviceView (StabrProcessor& p)
     motion.add (power, 14);
     power.onClick = [this] { showSetupMenu(); };
 
-    place (disk, 688, 12, 262, 71);
+    place (disk, 704, 12, 246, 71);
     disk.onClick = [this] { showSoundMenu(); };
 
     setupKey (diskPrev, {}, true, false, "Previous sound");
@@ -428,7 +428,6 @@ std::vector<DeviceView::VisualItem> DeviceView::getVisualItems() const
 
     add ("power", { (float) power.getBounds().getCentreX() - 20.0f, 32.0f, 40.0f, 26.0f });
     add ("disk bay", disk.getBounds().toFloat().withTrimmedLeft (FloppyDrive::kBayX));
-    add ("disk led", { (float) disk.getX() + 2.0f, (float) disk.getY() + 58.0f, 6.0f, 6.0f });
     add ("stab pad", { (float) stab.getX() + 8.0f, (float) stab.getY() + 4.0f, 196.0f, 204.0f });
     add ("vu meter", vu.getBounds().toFloat());
     add ("steps", steps.getBounds().toFloat());

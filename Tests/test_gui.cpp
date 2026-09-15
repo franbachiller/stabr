@@ -881,6 +881,13 @@ public:
                 view.selectPage (2, 0);
                 settle (t0 + 10.0);
                 save ("sp92_filter_page.png");
+
+                // Cambio de disco a mitad de camino: piloto de lectura encendido.
+                view.tick (t0 + 20.0);
+                proc.getPresetManager().loadFactoryPreset (1);
+                for (int i = 1; i <= 8; ++i)
+                    view.tick (t0 + 20.0 + i / 60.0);
+                save ("sp92_disk_swap.png");
             }
         }
     }
