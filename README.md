@@ -27,6 +27,14 @@ mínimo, abre y cierra el editor y lo descarga: ningún cuelgue al cerrar el DAW
 
 ![STABR SP-92](docs/manual/images/stabr-interface.png)
 
+| Beige '87 | Graphite '92 | Arctic '89 |
+|---|---|---|
+| ![Beige '87](docs/screenshots/sp92_finish_0.png) | ![Graphite '92](docs/screenshots/sp92_finish_1.png) | ![Arctic '89](docs/screenshots/sp92_finish_2.png) |
+
+Página del filtro, con la respuesta en frecuencia dibujada en la pantalla:
+
+![Página del filtro](docs/screenshots/sp92_filter_page.png)
+
 El plugin es un aparato: el sampler donde nació el stab. Plástico con textura,
 pantalla de matriz de puntos retroiluminada, pads de goma, palancas, VU de
 aguja, disquetera. Todo dibujado por código, sin imágenes, nítido de 75 % a
@@ -292,6 +300,9 @@ buffer, ausencia de NaN/inf y silencio exacto.
 ```bash
 ctest --test-dir build -C Release --output-on-failure
 ```
+
+Última ejecución (28/10/2026, build Release del último commit):
+`STABR: 2236214 aserciones ok, 0 fallos   TODO VERDE`.
 
 O directamente el ejecutable, que imprime el detalle:
 
